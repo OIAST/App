@@ -33,7 +33,7 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=1
 )
 
-name, authentication_status, username = authenticator.login('登入', 'main')
+name, authentication_status, username = authenticator.login('登入', 'sidebar')
 
 if authentication_status:
     authenticator.logout('登出', 'sidebar')
