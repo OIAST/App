@@ -16,19 +16,22 @@ hashed_passwords = [
     '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'  # 密碼是 '1234'
 ]
 
-# 使用正確語法建立 Authenticator（v0.3.2）
-authenticator = stauth.Authenticate(
-    credentials={
-        "usernames": {
-            usernames[0]: {
-                "name": names[0],
-                "password": hashed_passwords[0]
-            }
+# 建立 credentials 字典
+credentials = {
+    "usernames": {
+        usernames[0]: {
+            "name": names[0],
+            "password": hashed_passwords[0]
         }
-    },
-    cookie_name='my_cookie_name',
-    key='my_signature_key',
-    cookie_expiry_days=1
+    }
+}
+
+# 使用正確的參數順序建立 Authenticator
+authenticator = stauth.Authenticate(
+    credentials,
+    'my_cookie_name',
+    'my_signature_key',
+    1
 )
 
 # 顯示登入畫面
@@ -41,6 +44,7 @@ elif authentication_status is None:
 elif authentication_status:
     authenticator.logout('登出', 'sidebar')
     st.success(f'👋 歡迎 {name}')
+
     
     # 以下才是你原本的網站主程式 ↓↓↓↓↓
 
