@@ -4,44 +4,44 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
-import streamlit_authenticator as stauth
 
 import streamlit as st
 import streamlit_authenticator as stauth
 
-# ---------- 登入驗證區 ----------
 st.set_page_config(layout="wide")
 st.title("🔐 請先登入")
 
 names = ['訪客']
 usernames = ['david']
 hashed_passwords = [
-    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'  # 密碼是 '1234'
+    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'
 ]
 
-authenticator = stauth.Authenticate(
-    credentials={
-        "usernames": {
-            usernames[0]: {
-                "name": names[0],
-                "password": hashed_passwords[0]
-            }
+credentials = {
+    "usernames": {
+        usernames[0]: {
+            "name": names[0],
+            "password": hashed_passwords[0]
         }
-    },
+    }
+}
+
+authenticator = stauth.Authenticate(
+    credentials=credentials,
     cookie_name='my_cookie_name',
     key='my_signature_key',
     cookie_expiry_days=1
 )
 
-name, authentication_status, username = authenticator.login()
+name, authentication_status, username = authenticator.login('登入', 'main')
 
-if authentication_status is False:
+if authentication_status:
+    authenticator.logout('登出', 'sidebar')
+    st.success(f'👋 歡迎 {name}')
+elif authentication_status is False:
     st.error('❌ 帳號或密碼錯誤')
 elif authentication_status is None:
     st.warning('請輸入帳號與密碼')
-elif authentication_status:
-    authenticator.logout('登出', 'sidebar')
-    st.success(f'👋 歡迎 {name}')
     
     # 以下才是你原本的網站主程式 ↓↓↓↓↓
 
