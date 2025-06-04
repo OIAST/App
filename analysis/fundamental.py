@@ -1,71 +1,95 @@
 import streamlit as st
 import yfinance as yf
-import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
+def fuzzy_find(columns, target_keywords):
+    """模糊匹配欄位名稱"""
+    for keyword in target_keywords:
+        for col in columns:
+            if keyword.lower() in col.lower():
+                return col
+    return None
+
+def simplify_number(n):
+    """簡化數字顯示（萬、百萬、十億）"""
+    if abs(n) >= 1e9:
+        return f"{n/1e9:.1f}B"
+    elif abs(n) >= 1e6:
+        return f"{n/1e6:.1f}M"
+    elif abs(n) >= 1e4:
+        return f"{n/1e4:.1f}W"
+    else:
+        return str(round(n, 2))
 
 def run(symbol):
-    st.subheader("📊 基本面分析 - 資產負債表")
+    st.header("📊 資產負債表分析")
 
-    period = st.radio("選擇期間", ["年", "季"], horizontal=True)
-    ticker = yf.Ticker(symbol)
+    period_type = st.radio("選擇資料頻率", ["年度", "季"], horizontal=True)
+    is_annual = period_type == "年度"
 
-    df = ticker.balance_sheet if period == "年" else ticker.quarterly_balance_sheet
+    stock = yf.Ticker(symbol)
+    df = stock.balance_sheet if is_annual else stock.quarterly_balance_sheet
 
     if df.empty:
-        st.warning("找不到財報資料")
+        st.warning("⚠️ 無法取得財報資料，請確認股票代碼或稍後再試。")
         return
 
-    # 轉置 + index 格式處理
-    df = df.T.copy().sort_index()
-    if period == "年":
-        df.index = df.index.strftime('%y')
-    else:
-        df.index = [f"{d.year % 100}Q{(d.month - 1)//3 + 1}" for d in df.index]
+    df = df.T.sort_index()
+    df.index = df.index.strftime('%y' if is_annual else '%yQ%q')  # 顯示如 23 或 23Q1
 
-    # 檢查需要的欄位
-    required_cols = ["Total Assets", "Total Liab", "Total Stockholder Equity", 
-                     "Total Current Assets", "Total Current Liabilities"]
-    missing_cols = [col for col in required_cols if col not in df.columns]
+    # 模糊抓欄位
+    total_assets_col = fuzzy_find(df.columns, ["Total Assets"])
+    total_liab_col = fuzzy_find(df.columns, ["Total Liabilities", "Total Liab"])
+    equity_col = fuzzy_find(df.columns, ["Stockholder Equity", "Shareholders' Equity"])
+    current_assets_col = fuzzy_find(df.columns, ["Current Assets"])
+    current_liab_col = fuzzy_find(df.columns, ["Current Liabilities"])
 
-    if missing_cols:
-        st.error(f"以下欄位缺失，無法顯示圖表：{', '.join(missing_cols)}")
+    # 有任一欄位抓不到就顯示錯誤
+    required = [total_assets_col, total_liab_col, equity_col, current_assets_col, current_liab_col]
+    if None in required:
+        st.error("❌ 某些必要財報欄位未找到，無法顯示圖表。")
+        st.write("嘗試找到的欄位：", {
+            "Total Assets": total_assets_col,
+            "Total Liabilities": total_liab_col,
+            "Equity": equity_col,
+            "Current Assets": current_assets_col,
+            "Current Liabilities": current_liab_col,
+        })
         return
 
-    # 擷取資料
-    df = df.dropna(subset=required_cols)
-    assets = df["Total Assets"]
-    liabilities = df["Total Liab"]
-    equity = df["Total Stockholder Equity"]
-    current_assets = df["Total Current Assets"]
-    current_liab = df["Total Current Liabilities"]
-    non_current_assets = assets - current_assets
+    # 移除空值資料
+    df = df[[total_assets_col, total_liab_col, equity_col, current_assets_col, current_liab_col]].dropna()
 
-    # 資產結構圖
-    st.markdown("### 1. 資產結構圖（資產 = 負債 + 股東權益）")
-    fig1, ax1 = plt.subplots()
-    ax1.bar(df.index, liabilities, label="負債")
-    ax1.bar(df.index, equity, bottom=liabilities, label="股東權益")
-    ax1.set_title("資產結構")
-    ax1.legend()
-    st.pyplot(fig1)
+    # 圖表 1：資產結構（總資產、負債、股東權益）
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(df.index, df[total_assets_col], label="總資產", marker="o")
+    ax.plot(df.index, df[total_liab_col], label="負債", marker="o")
+    ax.plot(df.index, df[equity_col], label="股東權益", marker="o")
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: simplify_number(x)))
+    ax.set_title("資產結構")
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
 
-    # 流動與非流動資產變化
-    st.markdown("### 2. 流動資產與非流動資產變化")
-    fig2, ax2 = plt.subplots()
-    ax2.plot(df.index, current_assets, label="流動資產", marker="o")
-    ax2.plot(df.index, non_current_assets, label="非流動資產", marker="o")
-    ax2.set_title("資產構成變化")
+    # 圖表 2：流動資產與負債
+    fig2, ax2 = plt.subplots(figsize=(10, 5))
+    ax2.plot(df.index, df[current_assets_col], label="流動資產", marker="o")
+    ax2.plot(df.index, df[current_liab_col], label="流動負債", marker="o")
+    ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: simplify_number(x)))
+    ax2.set_title("流動資產與負債")
     ax2.legend()
+    ax2.grid(True)
     st.pyplot(fig2)
 
-    # 財務比率圖（負債比與流動比）
-    st.markdown("### 3. 負債比與流動比")
-    debt_ratio = liabilities / assets
-    current_ratio = current_assets / current_liab
-    fig3, ax3 = plt.subplots()
-    ax3.plot(df.index, debt_ratio, label="負債比", marker="o")
-    ax3.plot(df.index, current_ratio, label="流動比", marker="o")
-    ax3.axhline(1, color="gray", linestyle="--", linewidth=0.5)
-    ax3.set_title("財務比率變化")
+    # 圖表 3：負債比與流動比
+    df["負債比率"] = df[total_liab_col] / df[total_assets_col] * 100
+    df["流動比率"] = df[current_assets_col] / df[current_liab_col] * 100
+    fig3, ax3 = plt.subplots(figsize=(10, 5))
+    ax3.plot(df.index, df["負債比率"], label="負債比率 %", marker="o")
+    ax3.plot(df.index, df["流動比率"], label="流動比率 %", marker="o")
+    ax3.set_title("負債與流動比率")
     ax3.legend()
+    ax3.grid(True)
     st.pyplot(fig3)
