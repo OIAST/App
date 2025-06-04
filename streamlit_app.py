@@ -10,18 +10,6 @@ sns.set(style="whitegrid")
 plt.rcParams['axes.unicode_minus'] = False
 st.set_page_config(layout="wide")
 
-# ---------- 嵌入 Google Analytics ----------
-st.markdown("""
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-SKEFTBKDVH"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-SKEFTBKDVH');
-</script>
-""", unsafe_allow_html=True)
-
 st.title("📈 美股分析工具")
 
 # ---------- 輸入與選擇 ----------
