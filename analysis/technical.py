@@ -1,6 +1,8 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
+import pandas as pd  # ✅ 加這行
+
 
 def render_rsi_bar(symbol: str):
     stock = yf.Ticker(symbol)
