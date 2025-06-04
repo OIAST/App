@@ -27,15 +27,23 @@ credentials = {
 }
 
 # 使用正確的參數順序建立 Authenticator
+
 authenticator = stauth.Authenticate(
-    credentials,
+    {
+        "usernames": {
+            "david": {
+                "name": "訪客",
+                "password": "$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy"
+            }
+        }
+    },
     'my_cookie_name',
     'my_signature_key',
     1
 )
 
-# 顯示登入畫面
-name, authentication_status, username = authenticator.login('登入', 'main')
+# 登入（不加 form_name）
+name, authentication_status, username = authenticator.login('登入')
 
 if authentication_status is False:
     st.error('❌ 帳號或密碼錯誤')
