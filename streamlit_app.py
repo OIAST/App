@@ -49,7 +49,6 @@ else:
 # ---------- 基本設定 ----------
 sns.set(style="whitegrid")
 plt.rcParams['axes.unicode_minus'] = False
-st.set_page_config(layout="wide")
 
 st.title("📈 美股分析工具")
 
