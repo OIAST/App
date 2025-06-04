@@ -4,4 +4,4 @@ matplotlib
 seaborn
 streamlit
 streamlit-autorefresh
-streamlit-authenticator==0.4.2
+streamlit-authenticator==0.3.2
