@@ -5,6 +5,37 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 
+import streamlit as st
+import streamlit_authenticator as stauth
+
+# ---------- 使用者帳號與密碼 ----------
+names = ['訪客']
+usernames = ['david']
+passwords = ['1234']  # 可改成你自己的密碼
+
+# 加密密碼
+hashed_passwords = stauth.Hasher(passwords).generate()
+
+# 建立登入元件
+authenticator = stauth.Authenticate(
+    names, usernames, hashed_passwords,
+    'my_cookie_name', 'my_signature_key',
+    cookie_expiry_days=1
+)
+
+# 顯示登入視窗
+name, authentication_status, username = authenticator.login('登入', 'main')
+
+if authentication_status is False:
+    st.error('❌ 帳號或密碼錯誤')
+elif authentication_status is None:
+    st.warning('請輸入帳號與密碼')
+elif authentication_status:
+    authenticator.logout('登出', 'sidebar')
+    st.success(f'👋 歡迎 {name}')
+    
+    # 以下才是你原本的網站主程式 ↓↓↓↓↓
+
 # ---------- 基本設定 ----------
 sns.set(style="whitegrid")
 plt.rcParams['axes.unicode_minus'] = False
