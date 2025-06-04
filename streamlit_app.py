@@ -33,8 +33,7 @@ def login():
                 st.session_state.logged_in = True
                 st.session_state.username = username
                 st.success(f"登入成功，歡迎 {username}！")
-                time.sleep(1)  # ✅ 稍微等待後再 rerun
-                st.experimental_rerun()
+                
             else:
                 st.error("帳號或密碼錯誤")
 
