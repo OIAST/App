@@ -1,76 +1,74 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import matplotlib.pyplot as plt
 
-# 英文對應中文（簡化常見欄位，可擴充）
-column_map = {
-    "Total Assets": "總資產",
-    "Total Liab": "總負債",
-    "Cash": "現金",
-    "Cash And Cash Equivalents": "現金及約當現金",
-    "Net Income": "淨利",
-    "Total Revenue": "營收",
-    "Gross Profit": "毛利",
-    "Operating Income": "營業利益",
-    "Total Cash From Operating Activities": "營業活動現金流",
-    "Capital Expenditures": "資本支出",
-    "Free Cash Flow": "自由現金流",
-    # 可持續擴增
-}
+def run():
+    st.subheader("📊 基本面分析 - 資產負債表")
 
-def format_number(value):
-    try:
-        if abs(value) >= 1e8:
-            return f"{value / 1e8:.2f}億"
-        elif abs(value) >= 1e4:
-            return f"{value / 1e4:.2f}萬"
-        else:
-            return f"{value:.0f}"
-    except:
-        return value
-
-def translate_and_format(df: pd.DataFrame):
-    df = df.copy()
-    df.index = [column_map.get(i, i) for i in df.index]
-    return df.applymap(format_number)
-
-def run(symbol):
-    st.subheader(f"📊 基本面分析：{symbol}")
-
-    # 資料區間選擇（年報或季報）
-    freq = st.radio("選擇報表頻率：", ("年度報表", "季度報表"), horizontal=True)
-
+    symbol = st.session_state.get("selected_symbol", "AAPL")
+    period = st.radio("選擇資料頻率", ["年", "季"], horizontal=True)
+    
     ticker = yf.Ticker(symbol)
+    df = ticker.balance_sheet if period == "年" else ticker.quarterly_balance_sheet
+    df = df.T
+    df.index = pd.to_datetime(df.index)
+    df = df.sort_index()
+    df = df.fillna(0)
 
-    # 擷取三大報表
-    try:
-        if freq == "年度報表":
-            balance_sheet = ticker.balance_sheet
-            income_stmt = ticker.financials
-            cashflow_stmt = ticker.cashflow
+    # 資料簡化單位
+    def simplify(x):
+        if x >= 1e8:
+            return f"{x/1e8:.1f}億"
+        elif x >= 1e4:
+            return f"{x/1e4:.1f}萬"
         else:
-            balance_sheet = ticker.quarterly_balance_sheet
-            income_stmt = ticker.quarterly_financials
-            cashflow_stmt = ticker.quarterly_cashflow
-    except Exception as e:
-        st.error(f"無法擷取財報資料：{e}")
-        return
+            return f"{x:.0f}"
 
-    # 報表選擇
-    report = st.radio("選擇要顯示的報表：", ("資產負債表", "損益表", "現金流量表"), horizontal=True)
+    # 圖1：資產結構圖
+    st.markdown("### 🏗 資產結構圖")
+    total_assets = df.get("Total Assets", 0)
+    total_liabilities = df.get("Total Liab", 0)
+    shareholder_equity = df.get("Total Stockholder Equity", 0)
 
-    def show_table(df: pd.DataFrame, title: str):
-        if df.empty:
-            st.warning(f"⚠️ {title} 無資料")
-            return
-        df_display = translate_and_format(df)
-        df_display = df_display.T
-        df_display.index.name = "日期"
-        st.dataframe(df_display)
+    fig1, ax1 = plt.subplots()
+    ax1.stackplot(df.index, total_liabilities, shareholder_equity, labels=["負債", "股東權益"])
+    ax1.set_ylabel("金額")
+    ax1.set_title("資產結構圖")
+    ax1.legend(loc="upper left")
+    st.pyplot(fig1)
 
-    if report == "資產負債表":
-        show_table(balance_sheet, "資產負債表")
-    elif report == "損益表":
-        show_table(income_stmt, "損益表")
-    elif report == "現金流量表":
-        show_table(cashflow_stmt, "現金流量表")
+    # 圖2：流動資產 vs 非流動資產
+    st.markdown("### 🔄 流動資產與非流動資產")
+    current_assets = df.get("Total Current Assets", 0)
+    noncurrent_assets = total_assets - current_assets
+
+    fig2, ax2 = plt.subplots()
+    ax2.plot(df.index, current_assets, label="流動資產")
+    ax2.plot(df.index, noncurrent_assets, label="非流動資產")
+    ax2.set_ylabel("金額")
+    ax2.set_title("流動與非流動資產變化")
+    ax2.legend()
+    st.pyplot(fig2)
+
+    # 圖3：負債比與流動比
+    st.markdown("### 📉 財務比率")
+    current_liabilities = df.get("Total Current Liabilities", 1)
+    debt_ratio = total_liabilities / total_assets
+    current_ratio = current_assets / current_liabilities
+
+    fig3, ax3 = plt.subplots()
+    ax3.plot(df.index, debt_ratio, label="負債比", marker="o")
+    ax3.plot(df.index, current_ratio, label="流動比", marker="s")
+    ax3.set_ylabel("比例")
+    ax3.set_title("負債比與流動比")
+    ax3.legend()
+    st.pyplot(fig3)
+
+    # 圖4：股東權益變動
+    st.markdown("### 🧾 股東權益變動圖")
+    fig4, ax4 = plt.subplots()
+    ax4.plot(df.index, shareholder_equity, color='purple', marker="D")
+    ax4.set_ylabel("金額")
+    ax4.set_title("股東權益變動")
+    st.pyplot(fig4)
