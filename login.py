@@ -2,7 +2,7 @@ import streamlit as st
 import bcrypt
 
 username_correct = "david"
-hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼1234
+hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼為 1234
 
 def login():
     def handle_login():
@@ -12,7 +12,6 @@ def login():
             st.session_state.logged_in = True
             st.session_state.username = username
             st.session_state.login_error = False
-            st.experimental_rerun()
         else:
             st.session_state.login_error = True
 
@@ -29,4 +28,3 @@ def logout():
     if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.experimental_rerun()
