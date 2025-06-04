@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import datetime
 import bcrypt
 
 # ---------- 頁面設定 ----------
@@ -18,23 +19,34 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "login_error" not in st.session_state:
+    st.session_state.login_error = False
 
-# ---------- 登入邏輯（只需按一次） ----------
+# ---------- 登入邏輯 ----------
 def login():
-    username = st.text_input("帳號", key="username_input")
-    password = st.text_input("密碼", type="password", key="password_input")
-    if st.button("登入"):
+    def handle_login():
+        username = st.session_state.username_input
+        password = st.session_state.password_input
         if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
             st.session_state.logged_in = True
             st.session_state.username = username
+            st.session_state.login_error = False
         else:
-            st.error("帳號或密碼錯誤")
+            st.session_state.login_error = True
 
-# ---------- 登出 ----------
+    with st.form("login_form"):
+        st.text_input("帳號", key="username_input")
+        st.text_input("密碼", type="password", key="password_input")
+        st.form_submit_button("登入", on_click=handle_login)
+
+    if st.session_state.login_error:
+        st.error("❌ 帳號或密碼錯誤")
+
 def logout():
     if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
+        st.experimental_rerun()
 
 # ---------- 主程式 ----------
 if not st.session_state.logged_in:
