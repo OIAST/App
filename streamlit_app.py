@@ -6,23 +6,32 @@ import seaborn as sns
 import datetime
 import streamlit_authenticator as stauth
 
-# ---------- 使用者帳號與密碼 ----------
+import streamlit as st
+import streamlit_authenticator as stauth
+
+# 使用者資訊
 names = ['訪客']
 usernames = ['david']
-
-# 這是 '1234' 對應的 hashed 密碼（bcrypt 編碼）
 hashed_passwords = [
-    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'
+    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'  # 密碼是 '1234'
 ]
 
-# 建立登入元件
+# 使用正確語法建立 Authenticator（v0.3.2）
 authenticator = stauth.Authenticate(
-    names, usernames, hashed_passwords,
-    'my_cookie_name', 'my_signature_key',
+    credentials={
+        "usernames": {
+            usernames[0]: {
+                "name": names[0],
+                "password": hashed_passwords[0]
+            }
+        }
+    },
+    cookie_name='my_cookie_name',
+    key='my_signature_key',
     cookie_expiry_days=1
 )
 
-# 顯示登入視窗
+# 顯示登入畫面
 name, authentication_status, username = authenticator.login('登入', 'main')
 
 if authentication_status is False:
