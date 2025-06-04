@@ -4,43 +4,57 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
 
-# ---------- 基本設定 ----------
 sns.set(style="whitegrid")
 plt.rcParams['axes.unicode_minus'] = False
 
-st.title("📈 美股分析平台")
+st.title("📈 美股分析工具")
 
-# ---------- 使用者輸入股票代碼 ----------
-symbol = st.text_input("請輸入股票代碼（例如：TSLA）", value="TSLA").upper()
+# ---------- 選擇股票代碼 ----------
+symbol = st.text_input("輸入股票代碼（例如：TSLA）", value="TSLA").upper()
 
-# ---------- 選擇分析面向 ----------
-analysis_type = st.selectbox("選擇分析項目", ["基本面", "籌碼面", "技術面", "股價機率分析"])
+# ---------- 分析項目選單 ----------
+analysis_option = st.selectbox(
+    "選擇分析項目",
+    ["基本面", "籌碼面", "技術面", "股價機率分析"]
+)
 
-# ---------- 如果有股票代碼才繼續 ----------
+# ---------- 重設按鈕 ----------
+if st.button("🔄 重設"):
+    st.experimental_rerun()
+
+# ---------- 顯示分析區塊 ----------
 if symbol:
     ticker = yf.Ticker(symbol)
 
-    if analysis_type == "基本面":
-        st.info("📄 基本面分析功能尚未實作")
+    # 顯示盤中價格折線圖
+    try:
+        st.subheader("📉 今日盤中股價走勢")
+        intraday = ticker.history(interval="5m", period="1d")
+        fig_price, ax_price = plt.subplots(figsize=(10, 4))
+        intraday['Close'].plot(ax=ax_price)
+        ax_price.set_title(f"{symbol} Intraday Price (5-min intervals)")
+        ax_price.set_ylabel("Price")
+        st.pyplot(fig_price)
+    except Exception as e:
+        st.error(f"無法取得盤中價格資料：{e}")
 
-    elif analysis_type == "技術面":
-        st.info("📊 技術面分析功能尚未實作")
+    # 顯示目前股價
+    try:
+        current_price = ticker.history(period="1d")['Close'][-1]
+        st.metric(label="📌 目前股價", value=f"{current_price:.2f} USD")
+    except Exception:
+        st.warning("⚠️ 無法取得目前股價")
 
-    elif analysis_type == "股價機率分析":
-        st.info("📉 股價機率分析功能尚未實作")
-
-    elif analysis_type == "籌碼面":
+    if analysis_option == "籌碼面":
         expirations = ticker.options
-
         if not expirations:
             st.warning(f"⚠️ 找不到 {symbol} 的期權資料")
         else:
             expiry = st.selectbox("選擇期權到期日", expirations)
-            if st.button("完成籌碼面分析"):
+            if st.button("更新圖表"):
                 try:
                     spot_price = ticker.history(period="1d")['Close'][-1]
                     options = ticker.option_chain(expiry)
-
                     options_df = pd.concat([
                         options.calls.assign(type='call'),
                         options.puts.assign(type='put')
@@ -50,9 +64,8 @@ if symbol:
                     # 圖表 1：成交量熱力圖
                     st.subheader("📊 成交量熱力圖")
                     pivot_vol = data.pivot_table(index='strike', columns='type', values='volume', aggfunc='sum', fill_value=0)
-                    pivot_vol = pivot_vol.astype(int)
                     fig1, ax1 = plt.subplots(figsize=(10, 5))
-                    sns.heatmap(pivot_vol, cmap="YlGnBu", cbar_kws={'label': 'Volume'}, ax=ax1)
+                    sns.heatmap(pivot_vol.astype(int), cmap="YlGnBu", cbar_kws={'label': 'Volume'}, ax=ax1)
                     ax1.set_title(f"{symbol} Options Volume Heatmap ({expiry})")
                     st.pyplot(fig1)
 
@@ -63,7 +76,7 @@ if symbol:
                     ax2.set_title("Volume vs Implied Volatility")
                     st.pyplot(fig2)
 
-                    # 圖表 3：IV 分布圖
+                    # 圖表 3：IV 分布
                     st.subheader("📈 IV 分布圖")
                     iv = data['impliedVolatility']
                     mean_iv = iv.mean()
@@ -86,4 +99,6 @@ if symbol:
                     st.pyplot(fig4)
 
                 except Exception as e:
-                    st.error(f"❌ 發生錯誤：{e}")
+                    st.error(f"發生錯誤：{e}")
+    else:
+        st.info(f"💡 目前「{analysis_option}」分析尚未實作，敬請期待！")
