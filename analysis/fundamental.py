@@ -2,123 +2,110 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
-from rapidfuzz import fuzz, process
+from difflib import get_close_matches
 
-# 進階模糊比對欄位
-def fuzzy_match_column(columns, target_keywords, threshold=70):
-    best_match = None
-    best_score = 0
-    for keyword in target_keywords:
-        result = process.extractOne(keyword, columns, scorer=fuzz.token_sort_ratio)
-        if result and result[1] > best_score and result[1] >= threshold:
-            best_match = result[0]
-            best_score = result[1]
-    return best_match
+# 進階欄位對應函數
+def fuzzy_find(column_candidates, keywords):
+    found = {}
+    for key, kw_list in keywords.items():
+        match = None
+        for kw in kw_list:
+            match = get_close_matches(kw.lower(), [c.lower() for c in column_candidates], n=1, cutoff=0.7)
+            if match:
+                found[key] = next((c for c in column_candidates if c.lower() == match[0]), None)
+                break
+        if key not in found:
+            found[key] = None
+    return found
 
-# 數值轉換 例如 10000 -> 1W
-def convert_number(n):
-    if abs(n) >= 1e8:
-        return f"{n / 1e8:.1f}億"
-    elif abs(n) >= 1e4:
-        return f"{n / 1e4:.1f}萬"
+# 數值縮寫顯示
+def format_number(val):
+    if abs(val) >= 1e8:
+        return f"{val/1e8:.1f}億"
+    elif abs(val) >= 1e4:
+        return f"{val/1e4:.1f}萬"
     else:
-        return f"{n:.0f}"
+        return f"{val:.0f}"
 
 def run(symbol):
-    st.subheader("📊 基本面分析：資產負債表")
-
-    period_type = st.radio("選擇財報類型", ["季報", "年報"], horizontal=True)
-    is_annual = period_type == "年報"
-
-    st.markdown("資料來源：Yahoo Finance")
-
+    st.header("📊 基本面分析 - 資產負債表")
+    
+    # 年 or 季
+    freq = st.radio("選擇財報頻率", ["年度", "季度"], horizontal=True)
+    is_annual = freq == "年度"
+    
     ticker = yf.Ticker(symbol)
-
-    try:
-        df = ticker.quarterly_balance_sheet if not is_annual else ticker.balance_sheet
-        df = df.transpose()
-    except Exception as e:
-        st.error("❌ 無法下載財報資料，請檢查股票代碼。")
-        return
-
+    df = ticker.balance_sheet if is_annual else ticker.quarterly_balance_sheet
     if df.empty:
-        st.warning("⚠️ 無財報資料可顯示。")
+        st.warning("找不到財報資料")
         return
+    
+    df = df.T.sort_index()
+    df.index = df.index.strftime("%y") if is_annual else df.index.strftime("%yQ%q")
+    columns = df.columns.tolist()
 
-    # 嘗試模糊搜尋欄位
-    columns = list(df.columns)
-    assets_col = fuzzy_match_column(columns, ["Total Assets"])
-    liabilities_col = fuzzy_match_column(columns, ["Total Liabilities"])
-    equity_col = fuzzy_match_column(columns, ["Total Stockholder Equity", "Equity"])
-    current_assets_col = fuzzy_match_column(columns, ["Total Current Assets"])
-    current_liabilities_col = fuzzy_match_column(columns, ["Total Current Liabilities"])
-
-    found = {
-        "Total Assets": assets_col,
-        "Total Liabilities": liabilities_col,
-        "Equity": equity_col,
-        "Current Assets": current_assets_col,
-        "Current Liabilities": current_liabilities_col,
+    keywords = {
+        "Total Assets": ["total assets"],
+        "Total Liabilities": ["total liabilities", "total liab"],
+        "Equity": ["total stockholder equity", "equity", "shareholders equity"],
+        "Current Assets": ["total current assets", "current assets"],
+        "Current Liabilities": ["total current liabilities", "current liabilities"]
     }
+    matched = fuzzy_find(columns, keywords)
 
-    if None in found.values():
+    # 檢查是否都成功匹配
+    if None in matched.values():
         st.error("❌ 某些必要財報欄位未找到，無法顯示圖表。")
-        st.json(found)
+        st.json(matched)
         return
+    
+    df_filtered = df[[v for v in matched.values() if v]]
+    df_filtered = df_filtered.dropna()
 
-    # 數據處理
-    df = df[[assets_col, liabilities_col, equity_col, current_assets_col, current_liabilities_col]].dropna()
-    df = df.iloc[::-1]  # 時間由舊到新
-    df.index = df.index.to_series().dt.strftime('%yQ%q') if not is_annual else df.index.to_series().dt.strftime('%y')
-
-    # 資產結構圖
-    st.markdown("### 🏛️ 資產結構（總資產 = 負債 + 股東權益）")
+    # 圖表 1：資產結構（資產=負債+股東權益）
+    st.subheader("資產結構")
     fig1, ax1 = plt.subplots()
-    ax1.plot(df.index, df[assets_col], label="總資產", marker='o')
-    ax1.plot(df.index, df[liabilities_col], label="總負債", marker='o')
-    ax1.plot(df.index, df[equity_col], label="股東權益", marker='o')
+    ax1.plot(df_filtered.index, df_filtered[matched["Total Assets"]], label="資產", marker="o")
+    ax1.plot(df_filtered.index, df_filtered[matched["Total Liabilities"]], label="負債", marker="o")
+    ax1.plot(df_filtered.index, df_filtered[matched["Equity"]], label="股東權益", marker="o")
     ax1.legend()
-    ax1.set_title("資產結構")
     ax1.set_ylabel("金額")
+    ax1.set_title("資產 vs 負債 vs 權益")
     plt.xticks(rotation=45)
     st.pyplot(fig1)
 
-    # 流動資產 vs 非流動資產（簡化為總資產 - 流動資產）
-    st.markdown("### 🔄 流動資產與非流動資產變化")
+    # 圖表 2：流動 vs 非流動資產
+    st.subheader("流動與非流動資產變化")
+    current_assets = df_filtered[matched["Current Assets"]]
+    non_current_assets = df_filtered[matched["Total Assets"]] - current_assets
     fig2, ax2 = plt.subplots()
-    current_assets = df[current_assets_col]
-    non_current_assets = df[assets_col] - current_assets
-    ax2.plot(df.index, current_assets, label="流動資產", marker="o")
-    ax2.plot(df.index, non_current_assets, label="非流動資產", marker="o")
+    ax2.plot(df_filtered.index, current_assets, label="流動資產", marker="o")
+    ax2.plot(df_filtered.index, non_current_assets, label="非流動資產", marker="o")
     ax2.legend()
-    ax2.set_title("資產結構細分")
-    ax2.set_ylabel("金額")
+    ax2.set_title("資產結構變化")
     plt.xticks(rotation=45)
     st.pyplot(fig2)
 
-    # 負債比與流動比
-    st.markdown("### ⚖️ 財務比率：負債比與流動比")
-    df["負債比"] = df[liabilities_col] / df[assets_col]
-    df["流動比"] = df[current_assets_col] / df[current_liabilities_col]
+    # 圖表 3：負債比與流動比
+    st.subheader("財務比率")
+    debt_ratio = df_filtered[matched["Total Liabilities"]] / df_filtered[matched["Total Assets"]]
+    current_ratio = df_filtered[matched["Current Assets"]] / df_filtered[matched["Current Liabilities"]]
     fig3, ax3 = plt.subplots()
-    ax3.plot(df.index, df["負債比"], label="負債比", marker="o")
-    ax3.plot(df.index, df["流動比"], label="流動比", marker="o")
+    ax3.plot(df_filtered.index, debt_ratio, label="負債比", marker="o")
+    ax3.plot(df_filtered.index, current_ratio, label="流動比", marker="o")
     ax3.legend()
-    ax3.set_title("財務比率")
-    ax3.set_ylabel("比率")
+    ax3.set_title("負債比 vs 流動比")
     plt.xticks(rotation=45)
     st.pyplot(fig3)
 
-    # 顯示最新一筆數據表格
-    st.markdown("### 📄 最新財報摘要")
-    latest_row = df.iloc[-1].copy()
-    summary = {
-        "總資產": convert_number(latest_row[assets_col]),
-        "總負債": convert_number(latest_row[liabilities_col]),
-        "股東權益": convert_number(latest_row[equity_col]),
-        "流動資產": convert_number(latest_row[current_assets_col]),
-        "流動負債": convert_number(latest_row[current_liabilities_col]),
-        "負債比": f"{latest_row['負債比']:.2%}",
-        "流動比": f"{latest_row['流動比']:.2f}",
+    # 最新資料摘要
+    st.subheader("📋 最新財報摘要")
+    latest = df_filtered.iloc[-1]
+    data_summary = {
+        "資產": format_number(latest[matched["Total Assets"]]),
+        "負債": format_number(latest[matched["Total Liabilities"]]),
+        "權益": format_number(latest[matched["Equity"]]),
+        "流動資產": format_number(latest[matched["Current Assets"]]),
+        "流動負債": format_number(latest[matched["Current Liabilities"]]),
     }
-    st.table(pd.DataFrame(summary.items(), columns=["項目", "數值"]))
+    st.table(pd.DataFrame(data_summary.items(), columns=["項目", "金額"]))
