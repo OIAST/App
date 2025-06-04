@@ -3,9 +3,7 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import datetime
 import bcrypt
-import time  # ✅ 用於延遲 rerun
 
 # ---------- 頁面設定 ----------
 st.set_page_config(layout="wide")
@@ -13,7 +11,7 @@ st.title("🔐 請先登入")
 
 # ---------- 登入用戶資料 ----------
 username_correct = "david"
-hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"
+hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼是 "1234"
 
 # ---------- 建立 session state ----------
 if "logged_in" not in st.session_state:
@@ -32,8 +30,7 @@ def login():
             if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                st.success(f"登入成功，歡迎 {username}！")
-                
+                st.success(f"登入成功，歡迎 {username}！請稍候...")
             else:
                 st.error("帳號或密碼錯誤")
 
@@ -41,16 +38,12 @@ def logout():
     if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.experimental_rerun()
 
 # ---------- 主程式 ----------
-if not st.session_state.logged_in:
-    login()
-else:
+if st.session_state.logged_in:
     st.sidebar.success(f"👋 歡迎 {st.session_state.username}")
     logout()
 
-    # ---------- 主畫面 ----------
     st.title("📈 美股分析工具")
     sns.set(style="whitegrid")
     plt.rcParams['axes.unicode_minus'] = False
@@ -192,3 +185,6 @@ else:
     });
     </script>
     """, unsafe_allow_html=True)
+
+else:
+    login()
