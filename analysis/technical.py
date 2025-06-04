@@ -1,69 +1,65 @@
+import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-import streamlit as st
 
 def render_rsi_bar(symbol: str):
-    st.subheader(f"{symbol} RSI 技術指標視覺化")
+    stock = yf.Ticker(symbol)
+    df = stock.history(period="3mo", interval="1d")
 
-    data = yf.download(symbol, period="6mo", interval="1d")
-    if data.empty:
+    if df.empty:
         st.warning("無法取得股價資料")
         return
 
-    # 計算 RSI
-    delta = data["Close"].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
+    close = df["Close"]
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(window=14).mean()
+    avg_loss = loss.rolling(window=14).mean()
+    rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
-    data["RSI"] = rsi
 
-    if data["RSI"].dropna().empty:
-        st.warning("RSI 資料不足，無法顯示圖表")
-        return
+    latest_rsi = round(rsi.iloc[-1], 2)
+    current_price = round(close.iloc[-1], 2)
 
-    # 取得最近一筆 RSI 和股價
-    latest_rsi = data["RSI"].dropna().iloc[-1]
-    latest_price = data["Close"].iloc[-1]
+    low_rsi_price = close[rsi <= 30].min()
+    high_rsi_price = close[rsi >= 70].max()
 
-    # 模擬 RSI 30 和 RSI 70 對應的價格（估算）
-    rsi_30 = data[data["RSI"] <= 30]["Close"].mean()
-    rsi_70 = data[data["RSI"] >= 70]["Close"].mean()
-    if not rsi_30 or rsi_30 != rsi_30:
-        rsi_30 = data["Close"].quantile(0.1)
-    if not rsi_70 or rsi_70 != rsi_70:
-        rsi_70 = data["Close"].quantile(0.9)
+    low_rsi_price = round(low_rsi_price, 2) if not pd.isna(low_rsi_price) else current_price * 0.9
+    high_rsi_price = round(high_rsi_price, 2) if not pd.isna(high_rsi_price) else current_price * 1.1
 
-    # 建立圖表
     fig = go.Figure()
 
-    # RSI 區間條
+    # 建立條狀圖
     fig.add_trace(go.Bar(
-        x=[rsi_70 - rsi_30],
-        base=rsi_30,
-        orientation='h',
-        marker=dict(color='lightblue'),
-        name='RSI 區間'
+        x=["RSI 價格區間"],
+        y=[high_rsi_price - low_rsi_price],
+        base=low_rsi_price,
+        marker=dict(color="lightgray"),
+        name="RSI 區間"
     ))
 
-    # 現價點
+    # 加入目前價格的標示線
     fig.add_trace(go.Scatter(
-        x=[latest_price],
-        y=[0],
-        mode='markers+text',
-        marker=dict(color='red', size=12),
-        text=[f"現價: ${latest_price:.2f}"],
-        textposition='top center',
-        name='現價'
+        x=["RSI 價格區間"],
+        y=[current_price],
+        mode="markers+text",
+        marker=dict(color="red", size=10),
+        text=[f"目前價格：{current_price}"],
+        textposition="top center",
+        name="目前價格"
     ))
 
     fig.update_layout(
-        title=f"{symbol} RSI 區間條（RSI: {latest_rsi:.2f}）",
-        xaxis_title="股價",
-        yaxis=dict(visible=False),
-        height=150,
-        margin=dict(l=40, r=40, t=40, b=30),
-        showlegend=False
+        title=f"{symbol} RSI 條狀圖（目前 RSI: {latest_rsi}）",
+        yaxis_title="價格",
+        bargap=0.3,
+        height=400
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+def run(symbol: str):
+    st.header("📊 技術分析")
+    render_rsi_bar(symbol)
