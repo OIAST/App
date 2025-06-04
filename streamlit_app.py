@@ -1,8 +1,16 @@
 import streamlit as st
+
+# ✅ 加入 session 初始化
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "login_error" not in st.session_state:
+    st.session_state.login_error = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
 from login import login, logout
 from ui import render_floating_price_box
 from analysis import chips, fundamental, technical, probability
-
 
 # 頁面設定
 st.set_page_config(layout="wide")
