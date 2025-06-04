@@ -6,48 +6,54 @@ import seaborn as sns
 import datetime
 import bcrypt
 
-# ✅ 必須是第一個 Streamlit 指令
+# ---------- 頁面設定 ----------
 st.set_page_config(layout="wide")
-sns.set(style="whitegrid")
-plt.rcParams['axes.unicode_minus'] = False
+st.title("🔐 請先登入")
 
-# ---------- 使用者登入設定 ----------
+# ---------- 登入用戶資料 ----------
 username_correct = "david"
-hashed_password = b"$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy"  # bcrypt hash of "1234"
+hashed_password = b"$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy"  # 密碼是 "1234"
 
+# ---------- 建立 session state ----------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
 
+# ---------- 登入邏輯 ----------
 def login():
-    st.title("🔐 請先登入")
-    username = st.text_input("帳號")
-    password = st.text_input("密碼", type="password")
-    if st.button("登入"):
-        if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.success(f"登入成功，歡迎 {username}！")
-            st.experimental_rerun()
-        else:
-            st.error("❌ 帳號或密碼錯誤")
+    with st.form("login_form"):
+        username = st.text_input("帳號")
+        password = st.text_input("密碼", type="password")
+        submitted = st.form_submit_button("登入")
+
+        if submitted:
+            if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success(f"登入成功，歡迎 {username}！")
+                st.experimental_rerun()
+            else:
+                st.error("帳號或密碼錯誤")
 
 def logout():
-    if st.button("登出"):
+    if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.experimental_rerun()
 
-# ---------- 登入邏輯 ----------
+# ---------- 主程式 ----------
 if not st.session_state.logged_in:
     login()
 else:
-    st.title("📈 美股分析工具")
-    st.write(f"👋 歡迎 {st.session_state.username}")
+    st.sidebar.success(f"👋 歡迎 {st.session_state.username}")
     logout()
 
-    # ---------- 使用者輸入 ----------
+    # ---------- 主畫面 ----------
+    st.title("📈 美股分析工具")
+    sns.set(style="whitegrid")
+    plt.rcParams['axes.unicode_minus'] = False
+
     symbol = st.text_input("輸入股票代碼（例如：TSLA）", value="TSLA").upper()
     analysis_type = st.selectbox("選擇分析項目", ["基本面", "籌碼面", "技術面", "股價機率分析"])
 
@@ -138,11 +144,10 @@ else:
                 except Exception as e:
                     st.error(f"錯誤：{e}")
 
-    # ---------- 尚未實作的功能提示 ----------
     elif analysis_type in ["基本面", "技術面", "股價機率分析"]:
         st.info(f"🔧 『{analysis_type}』尚未實作，請選擇『籌碼面』進行期權分析。")
 
-    # ---------- CSS & JS 浮動視窗樣式 ----------
+    # ---------- 可拖曳浮動視窗 CSS + JS ----------
     st.markdown("""
     <style>
     #price-box {
