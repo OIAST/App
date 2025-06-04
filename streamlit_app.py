@@ -4,17 +4,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
-
-import streamlit as st
 import streamlit_authenticator as stauth
 
 # ---------- 使用者帳號與密碼 ----------
 names = ['訪客']
 usernames = ['david']
-passwords = ['1234']  # 可改成你自己的密碼
 
-# 加密密碼
-hashed_passwords = stauth.Hasher(passwords).generate()
+# 這是 '1234' 對應的 hashed 密碼（bcrypt 編碼）
+hashed_passwords = [
+    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'
+]
 
 # 建立登入元件
 authenticator = stauth.Authenticate(
