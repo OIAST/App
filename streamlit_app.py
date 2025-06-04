@@ -19,31 +19,31 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-# ---------- 登入邏輯 ----------
+# ---------- 登入邏輯（只需按一次） ----------
 def login():
-    with st.form("login_form"):
-        username = st.text_input("帳號")
-        password = st.text_input("密碼", type="password")
-        submitted = st.form_submit_button("登入")
+    username = st.text_input("帳號", key="username_input")
+    password = st.text_input("密碼", type="password", key="password_input")
+    if st.button("登入"):
+        if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
+            st.session_state.logged_in = True
+            st.session_state.username = username
+        else:
+            st.error("帳號或密碼錯誤")
 
-        if submitted:
-            if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.success(f"登入成功，歡迎 {username}！請稍候...")
-            else:
-                st.error("帳號或密碼錯誤")
-
+# ---------- 登出 ----------
 def logout():
     if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
 
 # ---------- 主程式 ----------
-if st.session_state.logged_in:
+if not st.session_state.logged_in:
+    login()
+else:
     st.sidebar.success(f"👋 歡迎 {st.session_state.username}")
     logout()
 
+    # ---------- 主畫面 ----------
     st.title("📈 美股分析工具")
     sns.set(style="whitegrid")
     plt.rcParams['axes.unicode_minus'] = False
@@ -185,6 +185,3 @@ if st.session_state.logged_in:
     });
     </script>
     """, unsafe_allow_html=True)
-
-else:
-    login()
