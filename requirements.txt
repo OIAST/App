@@ -5,3 +5,4 @@ seaborn
 streamlit
 streamlit-authenticator
 bcrypt
+rapidfuzz
