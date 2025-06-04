@@ -6,43 +6,45 @@ import seaborn as sns
 import datetime
 
 import streamlit as st
-import streamlit_authenticator as stauth
+import bcrypt
 
 st.set_page_config(layout="wide")
 st.title("🔐 請先登入")
 
-names = ['訪客']
-usernames = ['david']
-hashed_passwords = [
-    '$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy'
-]
+# 預設使用者資料
+username_correct = "david"
+hashed_password = b"$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy"  # bytes格式
 
-credentials = {
-    "usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
-        }
-    }
-}
+# 建立 session state 追蹤登入狀態
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-authenticator = stauth.Authenticate(
-    credentials=credentials,
-    cookie_name='my_cookie_name',
-    key='my_signature_key',
-    cookie_expiry_days=1
-)
+def login():
+    username = st.text_input("帳號")
+    password = st.text_input("密碼", type="password")
+    if st.button("登入"):
+        if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success(f"登入成功，歡迎 {username}！")
+        else:
+            st.error("帳號或密碼錯誤")
 
-name, authentication_status, username = authenticator.login('登入','unrendered')
+def logout():
+    if st.button("登出"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.experimental_rerun()
 
-if authentication_status:
-    authenticator.logout('登出', 'sidebar')
-    st.success(f'👋 歡迎 {name}')
-elif authentication_status is False:
-    st.error('❌ 帳號或密碼錯誤')
-elif authentication_status is None:
-    st.warning('請輸入帳號與密碼')
-    
+if not st.session_state.logged_in:
+    login()
+else:
+    st.write(f"👋 歡迎 {st.session_state.username}！")
+    logout()
+
+
     # 以下才是你原本的網站主程式 ↓↓↓↓↓
 
 # ---------- 基本設定 ----------
