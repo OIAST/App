@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 import bcrypt
+import time  # ✅ 用於延遲 rerun
 
 # ---------- 頁面設定 ----------
 st.set_page_config(layout="wide")
@@ -12,7 +13,7 @@ st.title("🔐 請先登入")
 
 # ---------- 登入用戶資料 ----------
 username_correct = "david"
-hashed_password = b"$2b$12$2749gsSBVYHq1Ji5pGHXZuKJvmTGOTmXQQ1OJF0I.QNVJ.50e4JJq"
+hashed_password = b"$2b$12$Ev/07R9qZweCzLoTo5diUO3L1R8ydI7Vp.Cv2MQs7zY8Mw09/dMyy"  # 密碼是 "1234"
 
 # ---------- 建立 session state ----------
 if "logged_in" not in st.session_state:
@@ -32,6 +33,7 @@ def login():
                 st.session_state.logged_in = True
                 st.session_state.username = username
                 st.success(f"登入成功，歡迎 {username}！")
+                time.sleep(1)  # ✅ 稍微等待後再 rerun
                 st.experimental_rerun()
             else:
                 st.error("帳號或密碼錯誤")
