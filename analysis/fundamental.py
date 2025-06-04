@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def run():
+def run(symbol):
     st.subheader("📊 基本面分析 - 資產負債表")
 
     symbol = st.session_state.get("selected_symbol", "AAPL")
