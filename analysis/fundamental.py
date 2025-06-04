@@ -9,28 +9,30 @@ def run(symbol):
     period = st.radio("選擇期間", ["年", "季"], horizontal=True)
     ticker = yf.Ticker(symbol)
 
-    if period == "年":
-        df = ticker.balance_sheet
-    else:
-        df = ticker.quarterly_balance_sheet
+    df = ticker.balance_sheet if period == "年" else ticker.quarterly_balance_sheet
 
     if df.empty:
         st.warning("找不到財報資料")
         return
 
-    # 轉置，並重設 index 格式
-    df = df.T.copy()
-    df = df.sort_index()
-
+    # 轉置 + index 格式處理
+    df = df.T.copy().sort_index()
     if period == "年":
         df.index = df.index.strftime('%y')
     else:
-        df.index = [f"{d.year%100}Q{(d.month - 1)//3 + 1}" for d in df.index]
+        df.index = [f"{d.year % 100}Q{(d.month - 1)//3 + 1}" for d in df.index]
 
-    # 移除缺值列，避免 plot 錯誤
-    df = df.dropna(subset=["Total Assets", "Total Liab", "Total Stockholder Equity", "Total Current Assets", "Total Current Liabilities"], how='any')
+    # 檢查需要的欄位
+    required_cols = ["Total Assets", "Total Liab", "Total Stockholder Equity", 
+                     "Total Current Assets", "Total Current Liabilities"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
 
-    # 資料欄位
+    if missing_cols:
+        st.error(f"以下欄位缺失，無法顯示圖表：{', '.join(missing_cols)}")
+        return
+
+    # 擷取資料
+    df = df.dropna(subset=required_cols)
     assets = df["Total Assets"]
     liabilities = df["Total Liab"]
     equity = df["Total Stockholder Equity"]
@@ -38,7 +40,7 @@ def run(symbol):
     current_liab = df["Total Current Liabilities"]
     non_current_assets = assets - current_assets
 
-    # 1. 資產結構圖
+    # 資產結構圖
     st.markdown("### 1. 資產結構圖（資產 = 負債 + 股東權益）")
     fig1, ax1 = plt.subplots()
     ax1.bar(df.index, liabilities, label="負債")
@@ -47,7 +49,7 @@ def run(symbol):
     ax1.legend()
     st.pyplot(fig1)
 
-    # 2. 流動與非流動資產變化
+    # 流動與非流動資產變化
     st.markdown("### 2. 流動資產與非流動資產變化")
     fig2, ax2 = plt.subplots()
     ax2.plot(df.index, current_assets, label="流動資產", marker="o")
@@ -56,7 +58,7 @@ def run(symbol):
     ax2.legend()
     st.pyplot(fig2)
 
-    # 3. 財務比率圖（負債比與流動比）
+    # 財務比率圖（負債比與流動比）
     st.markdown("### 3. 負債比與流動比")
     debt_ratio = liabilities / assets
     current_ratio = current_assets / current_liab
