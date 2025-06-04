@@ -1,196 +1,34 @@
 import streamlit as st
-import yfinance as yf
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import bcrypt
+from login import login, logout
+from ui import render_floating_price_box
+from analysis import chips, fundamental, technical, probability
+from utils import init_session
 
-# ----- 頁面設定 -----
+# 初始化 Session
+init_session()
+
+# 頁面設定
 st.set_page_config(layout="wide")
 
-# ----- 帳號密碼設定 -----
-username_correct = "david"
-hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼為 1234
-
-# ----- session 初始化 -----
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "login_error" not in st.session_state:
-    st.session_state.login_error = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-
-# ----- 登入邏輯 -----
-def login():
-    def handle_login():
-        username = st.session_state.username_input
-        password = st.session_state.password_input
-        if username == username_correct and bcrypt.checkpw(password.encode(), hashed_password):
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.session_state.login_error = False
-        else:
-            st.session_state.login_error = True
-
-    st.title("🔐 請先登入")
-    with st.form("login_form"):
-        st.text_input("帳號", key="username_input")
-        st.text_input("密碼", type="password", key="password_input")
-        st.form_submit_button("登入", on_click=handle_login)
-
-    if st.session_state.login_error:
-        st.error("❌ 帳號或密碼錯誤")
-
-# ----- 登出邏輯 -----
-def logout():
-    if st.sidebar.button("登出"):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        return
-
-# ----- 登入畫面或主畫面 -----
+# 登入流程
 if not st.session_state.logged_in:
     login()
 else:
     st.sidebar.success(f"👋 歡迎 {st.session_state.username}")
     logout()
 
-    # ======== 主功能開始 ========
+    # 主功能
     st.title("📈 美股分析工具")
-    sns.set(style="whitegrid")
-    plt.rcParams['axes.unicode_minus'] = False
-
     symbol = st.text_input("輸入股票代碼（例如：TSLA）", value="TSLA").upper()
     analysis_type = st.selectbox("選擇分析項目", ["基本面", "籌碼面", "技術面", "股價機率分析"])
 
-    # 浮動股價區塊
-    def render_floating_price_box(symbol):
-        ticker = yf.Ticker(symbol)
-        try:
-            data = ticker.history(period="1d", interval="1m")
-            if data.empty:
-                return
-            current = data['Close'][-1]
-            previous = data['Close'][-2]
-            change = current - previous
-            pct = (change / previous) * 100
-            color = 'green' if change >= 0 else 'red'
-            arrow = "▲" if change >= 0 else "▼"
-            st.markdown(
-                f"""
-                <div id="price-box" class="draggable">
-                    <div style='font-size:14px; color:black;'>目前價格：</div>
-                    <div style='font-size:20px; font-weight:bold; color:{color};'>{current:.2f} {arrow}</div>
-                    <div style='font-size:14px; color:{color};'>漲跌：{change:+.2f} ({pct:+.2f}%)</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        except:
-            pass
-
     render_floating_price_box(symbol)
 
-    # ======= 籌碼面分析 =======
-    if analysis_type == "籌碼面" and symbol:
-        ticker = yf.Ticker(symbol)
-        expirations = ticker.options
-        if not expirations:
-            st.warning(f"⚠️ 找不到 {symbol} 的期權資料")
-        else:
-            expiry = st.selectbox("選擇期權到期日", expirations)
-            if st.button("更新圖表"):
-                try:
-                    spot_price = ticker.history(period="1d")['Close'][-1]
-                    options = ticker.option_chain(expiry)
-                    options_df = pd.concat([
-                        options.calls.assign(type='call'),
-                        options.puts.assign(type='put')
-                    ])
-                    data = options_df[['strike', 'volume', 'impliedVolatility', 'type', 'lastPrice']].dropna()
-
-                    # 圖1：成交量熱力圖
-                    st.subheader("📊 成交量熱力圖")
-                    pivot_vol = data.pivot_table(index='strike', columns='type', values='volume', aggfunc='sum', fill_value=0)
-                    pivot_vol = pivot_vol.astype(int)
-                    fig1, ax1 = plt.subplots(figsize=(10, 5))
-                    sns.heatmap(pivot_vol, cmap="YlGnBu", cbar_kws={'label': 'Volume'}, ax=ax1)
-                    ax1.set_title(f"{symbol} Options Volume Heatmap ({expiry})")
-                    st.pyplot(fig1)
-
-                    # 圖2：市場情緒圖
-                    st.subheader("📌 市場情緒圖")
-                    fig2, ax2 = plt.subplots(figsize=(10, 5))
-                    sns.scatterplot(data=data, x='volume', y='impliedVolatility', hue='type', alpha=0.7, s=100, ax=ax2)
-                    ax2.set_title("Volume vs Implied Volatility")
-                    st.pyplot(fig2)
-
-                    # 圖3：IV 分布圖
-                    st.subheader("📈 IV 分布圖")
-                    iv = data['impliedVolatility']
-                    mean_iv = iv.mean()
-                    std_iv = iv.std()
-                    fig3, ax3 = plt.subplots(figsize=(10, 5))
-                    sns.histplot(iv, bins=30, kde=True, color='purple', ax=ax3)
-                    ax3.axvline(mean_iv, color='red', linestyle='--', label=f"Mean = {mean_iv:.3f}")
-                    ax3.axvline(mean_iv + std_iv, color='green', linestyle='--', label=f"+1 Std = {mean_iv + std_iv:.3f}")
-                    ax3.axvline(mean_iv - std_iv, color='green', linestyle='--', label=f"-1 Std = {mean_iv - std_iv:.3f}")
-                    ax3.legend()
-                    st.pyplot(fig3)
-
-                    # 圖4：IV vs Strike（有成交量）
-                    st.subheader("📉 IV vs Strike（有成交量）")
-                    filtered_data = data[data['volume'] > 0]
-                    fig4, ax4 = plt.subplots(figsize=(10, 5))
-                    sns.lineplot(data=filtered_data, x='strike', y='impliedVolatility', hue='type', marker='o', ax=ax4)
-                    ax4.axvline(spot_price, color='red', linestyle='--', label=f"Spot = {spot_price:.2f}")
-                    ax4.legend()
-                    st.pyplot(fig4)
-
-                except Exception as e:
-                    st.error(f"錯誤：{e}")
-
-    elif analysis_type in ["基本面", "技術面", "股價機率分析"]:
-        st.info(f"🔧 『{analysis_type}』尚未實作，請選擇『籌碼面』進行期權分析。")
-
-    # ======== 浮動價格視窗 CSS+JS ========
-    st.markdown("""
-    <style>
-    #price-box {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        background: #ffffffcc;
-        padding: 10px 15px;
-        border: 1px solid #999;
-        border-radius: 8px;
-        z-index: 9999;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-        cursor: move;
-    }
-    </style>
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const box = window.parent.document.querySelector('#price-box');
-        if (box) {
-            let isDragging = false;
-            let offsetX, offsetY;
-            box.addEventListener('mousedown', function (e) {
-                isDragging = true;
-                offsetX = e.clientX - box.getBoundingClientRect().left;
-                offsetY = e.clientY - box.getBoundingClientRect().top;
-            });
-            window.parent.document.addEventListener('mousemove', function (e) {
-                if (isDragging) {
-                    box.style.left = (e.clientX - offsetX) + 'px';
-                    box.style.top = (e.clientY - offsetY) + 'px';
-                    box.style.bottom = 'auto';
-                }
-            });
-            window.parent.document.addEventListener('mouseup', function () {
-                isDragging = false;
-            });
-        }
-    });
-    </script>
-    """, unsafe_allow_html=True)
+    if analysis_type == "籌碼面":
+        chips.render(symbol)
+    elif analysis_type == "基本面":
+        fundamental.render()
+    elif analysis_type == "技術面":
+        technical.render()
+    elif analysis_type == "股價機率分析":
+        probability.render()
