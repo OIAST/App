@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 
-import streamlit as st
 import bcrypt
 
 st.set_page_config(layout="wide")
