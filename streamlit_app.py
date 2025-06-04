@@ -10,11 +10,9 @@ sns.set(style="whitegrid")
 plt.rcParams['axes.unicode_minus'] = False
 st.set_page_config(layout="wide")
 
-from streamlit.components.v1 import html
-
 # ---------- 嵌入 Google Analytics ----------
-html("""
-<!-- Google tag (gtag.js) -->
+st.markdown("""
+<!-- Global site tag (gtag.js) - Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-SKEFTBKDVH"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -22,7 +20,7 @@ html("""
   gtag('js', new Date());
   gtag('config', 'G-SKEFTBKDVH');
 </script>
-""", height=0)
+""", unsafe_allow_html=True)
 
 st.title("📈 美股分析工具")
 
