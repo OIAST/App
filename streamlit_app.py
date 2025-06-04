@@ -3,8 +3,6 @@ from login import login, logout
 from ui import render_floating_price_box
 from analysis import chips, fundamental, technical, probability
 
-# 初始化 Session
-init_session()
 
 # 頁面設定
 st.set_page_config(layout="wide")
