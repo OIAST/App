@@ -30,10 +30,10 @@ else:
     render_floating_price_box(symbol)
 
     if analysis_type == "籌碼面":
-        chips.render(symbol)
+        chips.run(symbol)
     elif analysis_type == "基本面":
-        fundamental.render()
+        fundamental.run()
     elif analysis_type == "技術面":
-        technical.render()
+        technical.run()
     elif analysis_type == "股價機率分析":
-        probability.render()
+        probability.run()
