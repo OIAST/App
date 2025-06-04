@@ -12,7 +12,7 @@ st.title("🔐 請先登入")
 
 # ---------- 登入用戶資料 ----------
 username_correct = "david"
-hashed_password = b"$2b$12$qGH9UQUoZwrPjzyJdItGQeQUXJ0cvTx2ptTg2u0qlVFl6gkHpRPmC"
+hashed_password = b"$2b$12$2749gsSBVYHq1Ji5pGHXZuKJvmTGOTmXQQ1OJF0I.QNVJ.50e4JJq"
 
 # ---------- 建立 session state ----------
 if "logged_in" not in st.session_state:
