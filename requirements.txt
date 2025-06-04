@@ -1,5 +1,6 @@
-streamlit
 yfinance
 pandas
 matplotlib
 seaborn
+streamlit
+streamlit-autorefresh
