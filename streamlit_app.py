@@ -3,26 +3,24 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import datetime
 import bcrypt
 
-# ---------- 頁面設定 ----------
+# ----- 頁面設定 -----
 st.set_page_config(layout="wide")
-st.title("🔐 請先登入")
 
-# ---------- 登入用戶資料 ----------
+# ----- 帳號密碼設定 -----
 username_correct = "david"
-hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼是 "1234"
+hashed_password = b"$2b$12$vSeJMa5mUnyvdyFyI8BBKutgLW8QSdEc5uj7ABm5y3Z/W6UesojXC"  # 密碼為 1234
 
-# ---------- 建立 session state ----------
+# ----- session 初始化 -----
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
 if "login_error" not in st.session_state:
     st.session_state.login_error = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-# ---------- 登入邏輯 ----------
+# ----- 登入邏輯 -----
 def login():
     def handle_login():
         username = st.session_state.username_input
@@ -34,6 +32,7 @@ def login():
         else:
             st.session_state.login_error = True
 
+    st.title("🔐 請先登入")
     with st.form("login_form"):
         st.text_input("帳號", key="username_input")
         st.text_input("密碼", type="password", key="password_input")
@@ -42,20 +41,21 @@ def login():
     if st.session_state.login_error:
         st.error("❌ 帳號或密碼錯誤")
 
+# ----- 登出邏輯 -----
 def logout():
     if st.sidebar.button("登出"):
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.experimental_rerun()
+        return
 
-# ---------- 主程式 ----------
+# ----- 登入畫面或主畫面 -----
 if not st.session_state.logged_in:
     login()
 else:
     st.sidebar.success(f"👋 歡迎 {st.session_state.username}")
     logout()
 
-    # ---------- 主畫面 ----------
+    # ======== 主功能開始 ========
     st.title("📈 美股分析工具")
     sns.set(style="whitegrid")
     plt.rcParams['axes.unicode_minus'] = False
@@ -63,7 +63,7 @@ else:
     symbol = st.text_input("輸入股票代碼（例如：TSLA）", value="TSLA").upper()
     analysis_type = st.selectbox("選擇分析項目", ["基本面", "籌碼面", "技術面", "股價機率分析"])
 
-    # ---------- 股價浮動視窗 ----------
+    # 浮動股價區塊
     def render_floating_price_box(symbol):
         ticker = yf.Ticker(symbol)
         try:
@@ -91,7 +91,7 @@ else:
 
     render_floating_price_box(symbol)
 
-    # ---------- 籌碼面分析 ----------
+    # ======= 籌碼面分析 =======
     if analysis_type == "籌碼面" and symbol:
         ticker = yf.Ticker(symbol)
         expirations = ticker.options
@@ -109,7 +109,7 @@ else:
                     ])
                     data = options_df[['strike', 'volume', 'impliedVolatility', 'type', 'lastPrice']].dropna()
 
-                    # 圖表 1：成交量熱力圖
+                    # 圖1：成交量熱力圖
                     st.subheader("📊 成交量熱力圖")
                     pivot_vol = data.pivot_table(index='strike', columns='type', values='volume', aggfunc='sum', fill_value=0)
                     pivot_vol = pivot_vol.astype(int)
@@ -118,14 +118,14 @@ else:
                     ax1.set_title(f"{symbol} Options Volume Heatmap ({expiry})")
                     st.pyplot(fig1)
 
-                    # 圖表 2：市場情緒圖
+                    # 圖2：市場情緒圖
                     st.subheader("📌 市場情緒圖")
                     fig2, ax2 = plt.subplots(figsize=(10, 5))
                     sns.scatterplot(data=data, x='volume', y='impliedVolatility', hue='type', alpha=0.7, s=100, ax=ax2)
                     ax2.set_title("Volume vs Implied Volatility")
                     st.pyplot(fig2)
 
-                    # 圖表 3：IV 分布圖
+                    # 圖3：IV 分布圖
                     st.subheader("📈 IV 分布圖")
                     iv = data['impliedVolatility']
                     mean_iv = iv.mean()
@@ -138,7 +138,7 @@ else:
                     ax3.legend()
                     st.pyplot(fig3)
 
-                    # 圖表 4：IV vs Strike（有成交量）
+                    # 圖4：IV vs Strike（有成交量）
                     st.subheader("📉 IV vs Strike（有成交量）")
                     filtered_data = data[data['volume'] > 0]
                     fig4, ax4 = plt.subplots(figsize=(10, 5))
@@ -153,7 +153,7 @@ else:
     elif analysis_type in ["基本面", "技術面", "股價機率分析"]:
         st.info(f"🔧 『{analysis_type}』尚未實作，請選擇『籌碼面』進行期權分析。")
 
-    # ---------- 可拖曳浮動視窗 CSS + JS ----------
+    # ======== 浮動價格視窗 CSS+JS ========
     st.markdown("""
     <style>
     #price-box {
@@ -175,13 +175,11 @@ else:
         if (box) {
             let isDragging = false;
             let offsetX, offsetY;
-
             box.addEventListener('mousedown', function (e) {
                 isDragging = true;
                 offsetX = e.clientX - box.getBoundingClientRect().left;
                 offsetY = e.clientY - box.getBoundingClientRect().top;
             });
-
             window.parent.document.addEventListener('mousemove', function (e) {
                 if (isDragging) {
                     box.style.left = (e.clientX - offsetX) + 'px';
@@ -189,7 +187,6 @@ else:
                     box.style.bottom = 'auto';
                 }
             });
-
             window.parent.document.addEventListener('mouseup', function () {
                 isDragging = false;
             });
