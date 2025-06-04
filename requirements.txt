@@ -4,4 +4,4 @@ matplotlib
 seaborn
 streamlit
 streamlit-authenticator
-bcrypt==3.2.2
+bcrypt
