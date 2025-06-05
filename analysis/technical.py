@@ -13,24 +13,25 @@ def run(symbol: str):
         st.error("❌ 無法下載股價資料或成交量資料缺失")
         return
 
-    # 建立 volume_ma20 與 volume_std20 欄位
+    # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 確保欄位已經建立好
-    if "volume_ma20" not in data.columns or "volume_std20" not in data.columns:
-        st.error("❌ 無法建立 volume_ma20 或 volume_std20 欄位")
-        return
+    # 只保留那些計算完畢的資料
+    required_cols = ["volume_ma20", "volume_std20"]
+    available_cols = [col for col in required_cols if col in data.columns]
+    data = data.dropna(subset=available_cols).copy()
 
-    # 確保沒有 NaN 才能做計算
-    data = data.copy()
-    data = data.dropna(subset=["volume_ma20", "volume_std20"])
+    # 再次防呆（避免 dropna 還是沒結果）
+    if data.empty:
+        st.error("❌ 計算 Z-score 時無可用資料")
+        return
 
     # 計算 Z-score
     data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
     data["anomaly"] = data["zscore_volume"].abs() > 2
 
-    # 繪圖
+    # 畫圖
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.bar(data.index, data["Volume"], color="lightblue", label="成交量")
     ax.scatter(
