@@ -1,46 +1,66 @@
-import yfinance as yf
+# technical.py
+
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
+import yfinance as yf
 import streamlit as st
+import plotly.graph_objects as go
 
 def run(symbol: str):
-    st.subheader("📊 成交量異常檢定（Z-score）")
-
-    data = yf.download(symbol, period="6mo", interval="1d")
-
-    if data is None or data.empty or "Volume" not in data.columns:
-        st.error("❌ 無法下載股價資料或缺少成交量欄位")
+    st.subheader("📊 技術面分析：成交量異常（Z-score）")
+    
+    # 下載資料
+    try:
+        data = yf.download(symbol, period="6mo", interval="1d", progress=False)
+    except Exception as e:
+        st.error(f"資料抓取錯誤：{e}")
+        return
+    
+    if data.empty or "Volume" not in data.columns:
+        st.warning("⚠️ 無法取得有效資料")
         return
 
+    # 計算成交量 Z-score
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 安全 dropna
-    expected_cols = ["volume_ma20", "volume_std20"]
-    valid_cols = [col for col in expected_cols if col in data.columns]
-
-    if len(valid_cols) < len(expected_cols):
-        st.warning(f"⚠️ 缺少必要欄位：{set(expected_cols) - set(valid_cols)}，跳過 dropna 檢查。")
-    else:
-        data = data.dropna(subset=valid_cols)
-
-    if data.empty:
-        st.error("❌ 資料為空，無法進行後續分析")
+    # 確保欄位存在才進一步計算
+    if "volume_ma20" not in data.columns or "volume_std20" not in data.columns:
+        st.warning("⚠️ 無法建立 Z-score 所需欄位")
         return
 
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    data["anomaly"] = data["zscore_volume"].abs() > 2
+    # 防止除以 0
+    data["volume_std20"].replace(0, np.nan, inplace=True)
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(data.index, data["Volume"], color="skyblue", label="成交量")
-    ax.scatter(
-        data[data["anomaly"]].index,
-        data[data["anomaly"]]["Volume"],
-        color="red", label="異常", zorder=5
+    # 計算異常 Z-score（成交量）
+    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    data.dropna(subset=["zscore_volume"], inplace=True)
+
+    # 顯示最近一段時間
+    recent_data = data.tail(60)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=recent_data.index,
+        y=recent_data["zscore_volume"],
+        name="Volume Z-score",
+        marker_color=np.where(recent_data["zscore_volume"] > 2, 'red', 'blue')
+    ))
+
+    fig.update_layout(
+        title=f"{symbol} 近期成交量異常（Z-score）",
+        xaxis_title="日期",
+        yaxis_title="Z-score",
+        showlegend=False,
+        height=400
     )
-    ax.set_title(f"{symbol} 成交量異常（Z-score > 2）")
-    ax.set_ylabel("Volume")
-    ax.legend()
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    st.pyplot(fig)
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 顯示異常交易日
+    abnormal_days = recent_data[recent_data["zscore_volume"] > 2]
+    if not abnormal_days.empty:
+        st.markdown("### 🚨 異常交易日（Z-score > 2）")
+        st.dataframe(abnormal_days[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].round(2))
+    else:
+        st.info("近期無明顯異常交易量。")
