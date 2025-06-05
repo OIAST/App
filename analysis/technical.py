@@ -1,76 +1,58 @@
 import yfinance as yf
 import streamlit as st
-import plotly.graph_objects as go
 import pandas as pd
 
 def fetch_rsi(symbol: str, period: int = 14):
-    data = yf.download(symbol, period="3mo", interval="1d")
-    delta = data["Adj Close"].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
+    ticker = yf.Ticker(symbol)
+    data = ticker.history(period="3mo", interval="1d", auto_adjust=True)
+
+    if "Close" not in data.columns or data.empty:
+        return None, None
+
+    delta = data["Close"].diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+
     avg_gain = gain.rolling(window=period).mean()
     avg_loss = loss.rolling(window=period).mean()
+
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
-    return data["Adj Close"], rsi
 
-def price_from_rsi(adj_close, rsi_series, target_rsi):
-    valid = (~rsi_series.isna()) & (~adj_close.isna())
-    if not valid.any():
-        return None
-    rsi_filtered = rsi_series[valid]
-    price_filtered = adj_close[valid]
-    closest_idx = (rsi_filtered - target_rsi).abs().idxmin()
-    return price_filtered.loc[closest_idx]
+    return data["Close"], rsi
+
 
 def render_rsi_bar(symbol: str):
     adj_close, rsi = fetch_rsi(symbol)
+
+    if adj_close is None or rsi is None or rsi.dropna().empty:
+        st.warning("⚠️ 無法取得 RSI 資料。請確認股票代碼正確或稍後再試。")
+        return
+
     current_price = adj_close.iloc[-1]
+    latest_rsi = rsi.iloc[-1]
 
-    low_rsi_price = price_from_rsi(adj_close, rsi, 30)
-    high_rsi_price = price_from_rsi(adj_close, rsi, 70)
+    # RSI 區間設定
+    rsi_min, rsi_max = 30, 70
+    rsi_pos = (latest_rsi - rsi_min) / (rsi_max - rsi_min)
+    rsi_pos = max(0, min(1, rsi_pos))  # 限制在 [0, 1] 範圍
 
-    if pd.isna(current_price) or current_price == 0:
-        st.warning("❌ 無法取得目前股價。")
-        return
+    bar_width = 40  # 可調整條寬
+    filled = int(bar_width * rsi_pos)
+    empty = bar_width - filled
 
-    if pd.isna(low_rsi_price) or pd.isna(high_rsi_price):
-        st.warning("❌ 無法估算 RSI 價格區間。")
-        return
+    rsi_bar = "⬛" * filled + "⬜" * empty
 
-    fig = go.Figure()
+    st.subheader("📊 RSI 快速條")
+    st.markdown(f"""
+    <div style="font-family: monospace; font-size: 20px;">
+        RSI: <b>{latest_rsi:.2f}</b><br>
+        價格: ${current_price:.2f}<br>
+        <span style="color:#888;">30</span> {rsi_bar} <span style="color:#888;">70</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    fig.add_trace(go.Bar(
-        y=["RSI 價格區間"],
-        x=[high_rsi_price - low_rsi_price],
-        base=low_rsi_price,
-        orientation='h',
-        marker=dict(color='lightgray'),
-        hoverinfo='x',
-        name='RSI 區間'
-    ))
-
-    fig.add_trace(go.Scatter(
-        y=["RSI 價格區間"],
-        x=[current_price],
-        mode="markers+text",
-        marker=dict(color="red", size=14),
-        text=[f"現價 {current_price:.2f}"],
-        textposition="top right",
-        name="現價"
-    ))
-
-    fig.update_layout(
-        title="RSI 價格位置條",
-        height=180,
-        margin=dict(l=20, r=20, t=30, b=10),
-        xaxis=dict(title="價格"),
-        yaxis=dict(showticklabels=False),
-        showlegend=False
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
 
 def run(symbol: str):
-    st.subheader("技術指標快速概覽")
+    st.header("📈 技術面分析")
     render_rsi_bar(symbol)
