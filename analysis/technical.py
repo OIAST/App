@@ -14,30 +14,26 @@ def run(symbol: str):
         return
 
     # 計算 20MA 與 20STD
-    try:
-        data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-        data["volume_std20"] = data["Volume"].rolling(window=20).std()
-    except Exception as e:
-        st.error(f"❌ 移動平均計算錯誤: {e}")
-        return
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 並排檢查欄位與 dropna（保證欄位存在才 drop）
-    if "volume_ma20" not in data.columns or "volume_std20" not in data.columns:
-        st.error("❌ 必要欄位缺失，無法繼續分析")
-        return
+    # 丟掉NA資料
+    data = data.dropna(subset=["volume_ma20", "volume_std20"]).copy()
 
-    data = data.dropna().copy()  # 安全地刪除任何 NA 資料
-
-    # 再確認資料夠用
     if data.empty:
         st.warning("⚠️ 有效資料不足，請選更長的區間")
         return
 
-    # 計算 Z-score
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    data["anomaly"] = data["zscore_volume"].abs() > 2
+    try:
+        # 計算 Z-score（這裡不應再報錯）
+        zscore = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+        data["zscore_volume"] = zscore
+        data["anomaly"] = data["zscore_volume"].abs() > 2
+    except Exception as e:
+        st.error(f"❌ Z-score 計算錯誤: {e}")
+        return
 
-    # 繪圖
+    # 畫圖
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.bar(data.index, data["Volume"], color="lightblue", label="成交量")
     ax.scatter(
