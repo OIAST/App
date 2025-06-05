@@ -1,65 +1,47 @@
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import streamlit as st
 import plotly.graph_objects as go
 
-def run(symbol: str):
-    st.subheader(f"📈 技術面分析 - {symbol}")
+def run(symbol):
+    st.subheader("📊 技術分析圖表")
 
-    data = yf.download(symbol, interval="1d", period="6mo")
+    try:
+        data = yf.download(symbol, period="3mo", interval="1d")
+    except Exception as e:
+        st.error(f"資料載入錯誤：{e}")
+        return
 
-    if data.empty:
-        st.error("❌ 無法取得資料，請確認股票代碼")
+    if data.empty or "Volume" not in data.columns:
+        st.error("⚠️ 找不到成交量資料")
         return
 
     # 計算移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 檢查要使用的欄位是否存在於 DataFrame
-    subset_cols = ["volume_ma20", "volume_std20"]
-    missing_cols = [col for col in subset_cols if col not in data.columns]
-
+    # 確認欄位是否存在
+    missing_cols = [col for col in ["volume_ma20", "volume_std20"] if col not in data.columns]
     if missing_cols:
-        st.error(f"❌ 缺少欄位：{missing_cols}，無法繼續計算")
-        st.write("現有欄位：", data.columns.tolist())
+        st.error(f"⚠️ 缺少欄位：{missing_cols}")
         return
 
-    try:
-        data = data.dropna(subset=subset_cols).copy()
-    except KeyError as e:
-        st.error(f"⚠️ dropna 時欄位錯誤：{e}")
+    # 檢查是否全為 NaN（例如資料太少）
+    if data[["volume_ma20", "volume_std20"]].isna().all().any():
+        st.warning("⚠️ 無法計算移動平均，資料可能不足")
         return
 
-    if data.empty:
-        st.warning("⚠️ 資料在 dropna 後為空，請更換股票代碼或時間區間")
-        return
+    # 清除 NaN 資料
+    data = data.dropna(subset=["volume_ma20", "volume_std20"])
 
-    # 計算 z-score volume
+    # 計算 z-score
     data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
 
-    # 畫 K 線圖
-    fig = go.Figure(data=[
-        go.Candlestick(
-            x=data.index,
-            open=data["Open"],
-            high=data["High"],
-            low=data["Low"],
-            close=data["Close"],
-            name="K 線"
-        )
-    ])
-    fig.update_layout(title=f"{symbol} K 線圖", xaxis_title="日期", yaxis_title="價格")
-    st.plotly_chart(fig, use_container_width=True)
+    # 畫圖
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=data.index, y=data["zscore_volume"], name="Z-Score Volume"))
+    fig.update_layout(title=f"{symbol} - 成交量 Z-Score", xaxis_title="日期", yaxis_title="Z-Score")
+    st.plotly_chart(fig)
 
-    # 畫 Z-score 成交量
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(
-        x=data.index,
-        y=data["zscore_volume"],
-        mode="lines",
-        name="Z-score Volume"
-    ))
-    fig2.update_layout(title="成交量 Z-score", xaxis_title="日期", yaxis_title="Z-score")
-    st.plotly_chart(fig2, use_container_width=True)
+    st.dataframe(data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(10))
