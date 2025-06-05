@@ -1,37 +1,30 @@
-# technical.py
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
-def run(symbol, data: pd.DataFrame):
-    st.subheader("📊 技術面分析 - Volume Z-score")
+def run(symbol, data):
+    st.subheader("📊 技術指標：Z-score 成交量")
 
-    if "Volume" not in data.columns:
-        st.warning("⚠️ 請提供包含 Volume 欄位的 DataFrame")
-        return
-
-    # ✅ 先計算這些欄位
-    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-    data["volume_std20"] = data["Volume"].rolling(window=20).std()
-
-    # ✅ 再做 dropna，避免欄位不存在時報錯
     try:
-        data_clean = data.dropna(subset=["volume_ma20", "volume_std20", "Volume"]).copy()
-    except KeyError as e:
-        st.warning(f"⚠️ 欄位遺失：{e}")
-        return
+        # ✅ 計算移動平均與標準差
+        data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+        data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    if data_clean.empty:
-        st.warning("⚠️ 無足夠資料進行技術分析")
-        return
+        # ✅ 避免 KeyError
+        required_cols = ["Volume", "volume_ma20", "volume_std20"]
+        missing = [col for col in required_cols if col not in data.columns]
+        if missing:
+            st.warning(f"⚠️ 欄位遺失：{missing}")
+            return
 
-    # ✅ 計算 Z-score
-    data_clean["zscore_volume"] = (
-        (data_clean["Volume"] - data_clean["volume_ma20"]) / data_clean["volume_std20"]
-    )
+        # ✅ 避免 ValueError（NaN 導致 z-score 無法計算）
+        data = data.dropna(subset=required_cols).copy()
+        if data.empty:
+            st.warning("⚠️ 沒有足夠的有效資料來計算 Z-score")
+            return
 
-    # ✅ 畫圖
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=data_clean.index, y=data_clean["zscore_volume"], mode='lines', name='Volume Z-score'))
-    fig.update_layout(title=f"{symbol} Volume Z-score（20日）", xaxis_title="Date", yaxis_title="Z-score")
-    st.plotly_chart(fig, use_container_width=True)
+        # ✅ 計算 z-score
+        data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+        st.line_chart(data["zscore_volume"])
+
+    except Exception as e:
+        st.error(f"❌ 錯誤發生：{e}")
