@@ -1,47 +1,51 @@
-import streamlit as st
-import yfinance as yf
+# technical.py
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+import streamlit as st  # 如果你是在 Streamlit 使用這個module才需要
 
-def run(symbol):
-    st.subheader("📊 技術分析圖表")
+def run(symbol, data=None):
+    """
+    參數說明：
+    - symbol: 股票代碼（字串）
+    - data: 預先抓好的 DataFrame，若 None 則嘗試自行抓取（範例中沒有內建抓資料功能）
 
-    try:
-        data = yf.download(symbol, period="3mo", interval="1d")
-    except Exception as e:
-        st.error(f"資料載入錯誤：{e}")
-        return
+    回傳值：
+    - 加入了 volume_ma20、volume_std20、zscore_volume 的 DataFrame
+    """
 
-    if data.empty or "Volume" not in data.columns:
-        st.error("⚠️ 找不到成交量資料")
-        return
+    # 假設外部已經提供 data，且欄位有 Volume
+    if data is None:
+        st.warning("⚠️ 請提供包含 Volume 欄位的 DataFrame")
+        return None
 
-    # 計算移動平均與標準差
+    # 先確認必須欄位
+    if "Volume" not in data.columns:
+        st.warning("⚠️ 欄位 Volume 不存在，無法計算指標")
+        return None
+
+    # 計算20日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 確認欄位是否存在
-    missing_cols = [col for col in ["volume_ma20", "volume_std20"] if col not in data.columns]
-    if missing_cols:
-        st.error(f"⚠️ 缺少欄位：{missing_cols}")
-        return
+    # 準備 dropna 的欄位列表，並確定這些欄位在 data 中存在
+    subset_cols = ["volume_ma20", "volume_std20"]
+    existing_cols = [col for col in subset_cols if col in data.columns]
 
-    # 檢查是否全為 NaN（例如資料太少）
-    if data[["volume_ma20", "volume_std20"]].isna().all().any():
-        st.warning("⚠️ 無法計算移動平均，資料可能不足")
-        return
+    if len(existing_cols) < len(subset_cols):
+        missing = list(set(subset_cols) - set(existing_cols))
+        st.warning(f"⚠️ 欄位缺失無法計算：{missing}")
+        return None
 
-    # 清除 NaN 資料
-    data = data.dropna(subset=["volume_ma20", "volume_std20"])
+    # 去除在這些欄位中有缺失值的列，避免計算錯誤
+    data = data.dropna(subset=existing_cols).copy()
 
-    # 計算 z-score
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 計算 z-score volume
+    # 用 try-except 防止除以零或 NaN 引發錯誤
+    try:
+        data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    except Exception as e:
+        st.warning(f"⚠️ 計算 z-score volume 時發生錯誤: {e}")
+        return None
 
-    # 畫圖
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=data.index, y=data["zscore_volume"], name="Z-Score Volume"))
-    fig.update_layout(title=f"{symbol} - 成交量 Z-Score", xaxis_title="日期", yaxis_title="Z-Score")
-    st.plotly_chart(fig)
-
-    st.dataframe(data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(10))
+    # 回傳處理後的 DataFrame
+    return data
