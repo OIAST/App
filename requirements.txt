@@ -7,3 +7,4 @@ streamlit-authenticator
 bcrypt
 rapidfuzz
 plotly
+numpy
