@@ -1,30 +1,40 @@
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
+import streamlit as st
 
-# 選擇大型股（例如 AAPL）
-symbol = "AAPL"
-data = yf.download(symbol, period="6mo", interval="1d")
+def run(symbol: str):
+    st.subheader("📊 成交量異常檢定（Z-score）")
 
-# 計算 20 日移動平均與標準差（用於 Z-score）
-data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-data["volume_std20"] = data["Volume"].rolling(window=20).std()
-data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 資料擷取
+    data = yf.download(symbol, period="6mo", interval="1d")
+    if data is None or data.empty or "Volume" not in data.columns:
+        st.error("❌ 無法下載股價資料或成交量資料缺失")
+        return
 
-# 偵測異常成交量（Z-score > 2）
-data["anomaly"] = data["zscore_volume"].abs() > 2
+    # 清理與特徵工程
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-# 繪圖：成交量與異常點
-fig, ax1 = plt.subplots(figsize=(12, 6))
-ax1.bar(data.index, data["Volume"], color="skyblue", label="Volume")
-ax1.scatter(
-    data[data["anomaly"]].index,
-    data[data["anomaly"]]["Volume"],
-    color="red", label="Anomaly", zorder=5
-)
-ax1.set_title(f"{symbol} Volume Anomaly Detection (Z-score > 2)")
-ax1.set_ylabel("Volume")
-ax1.legend()
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+    # 避免出現 NaN 導致錯誤
+    if data["volume_std20"].isna().all():
+        st.error("❌ 標準差計算失敗，資料不足")
+        return
+
+    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    data["anomaly"] = data["zscore_volume"].abs() > 2
+
+    # 圖表呈現
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.bar(data.index, data["Volume"], color="skyblue", label="Volume")
+    ax.scatter(
+        data[data["anomaly"]].index,
+        data[data["anomaly"]]["Volume"],
+        color="red", label="異常點", zorder=5
+    )
+    ax.set_title(f"{symbol} 成交量異常 Z-score (>2)")
+    ax.set_ylabel("Volume")
+    ax.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    st.pyplot(fig)
