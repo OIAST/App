@@ -6,45 +6,42 @@ import streamlit as st
 def run(symbol: str):
     st.subheader("📊 成交量異常檢定（Z-score）")
 
-    # 下載資料
+    # 抓取資料
     data = yf.download(symbol, period="6mo", interval="1d")
 
     if data is None or data.empty or "Volume" not in data.columns:
-        st.error("❌ 無法下載股價資料或成交量資料缺失")
+        st.error("❌ 無法下載股價資料或缺少成交量欄位")
         return
 
-    # 安全建立欄位
-    try:
-        data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-        data["volume_std20"] = data["Volume"].rolling(window=20).std()
-    except Exception as e:
-        st.error(f"❌ 計算移動平均時錯誤: {e}")
+    # 建立移動平均與標準差欄位（會產生 NaN 開頭）
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
+
+    # 只對實際存在的欄位進行 dropna
+    valid_cols = [col for col in ["volume_ma20", "volume_std20"] if col in data.columns]
+    if not valid_cols:
+        st.error("❌ 必要欄位不存在，無法繼續分析")
         return
 
-    # 檢查欄位存在且不為空
-    if not all(col in data.columns for col in ["volume_ma20", "volume_std20"]):
-        st.error("❌ 缺少必要欄位 volume_ma20 或 volume_std20")
-        return
+    data = data.dropna(subset=valid_cols)
 
-    # 丟掉 NaN
-    data = data.dropna(subset=["volume_ma20", "volume_std20"])
     if data.empty:
-        st.error("❌ 無法計算異常值（有效資料不足）")
+        st.error("❌ 有效資料筆數為 0，無法分析")
         return
 
-    # 計算 Z-score
+    # 計算 z-score
     data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
     data["anomaly"] = data["zscore_volume"].abs() > 2
 
     # 畫圖
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(data.index, data["Volume"], color="lightblue", label="成交量")
+    ax.bar(data.index, data["Volume"], color="skyblue", label="成交量")
     ax.scatter(
         data[data["anomaly"]].index,
         data[data["anomaly"]]["Volume"],
         color="red", label="異常", zorder=5
     )
-    ax.set_title(f"{symbol} 成交量異常 Z-score (> 2)")
+    ax.set_title(f"{symbol} 成交量異常（Z-score > 2）")
     ax.set_ylabel("Volume")
     ax.legend()
     plt.xticks(rotation=45)
