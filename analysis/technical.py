@@ -13,18 +13,23 @@ def run(symbol: str):
         st.error("❌ 無法下載股價資料或成交量資料缺失")
         return
 
-    # 計算 20 日移動平均與標準差
-    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-    data["volume_std20"] = data["Volume"].rolling(window=20).std()
+    # 安全建立欄位
+    try:
+        data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+        data["volume_std20"] = data["Volume"].rolling(window=20).std()
+    except Exception as e:
+        st.error(f"❌ 計算移動平均時錯誤: {e}")
+        return
 
-    # 只保留那些計算完畢的資料
-    required_cols = ["volume_ma20", "volume_std20"]
-    available_cols = [col for col in required_cols if col in data.columns]
-    data = data.dropna(subset=available_cols).copy()
+    # 檢查欄位存在且不為空
+    if not all(col in data.columns for col in ["volume_ma20", "volume_std20"]):
+        st.error("❌ 缺少必要欄位 volume_ma20 或 volume_std20")
+        return
 
-    # 再次防呆（避免 dropna 還是沒結果）
+    # 丟掉 NaN
+    data = data.dropna(subset=["volume_ma20", "volume_std20"])
     if data.empty:
-        st.error("❌ 計算 Z-score 時無可用資料")
+        st.error("❌ 無法計算異常值（有效資料不足）")
         return
 
     # 計算 Z-score
