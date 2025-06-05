@@ -1,51 +1,43 @@
 # technical.py
+
 import pandas as pd
 import numpy as np
-import streamlit as st  # 如果你是在 Streamlit 使用這個module才需要
+import matplotlib.pyplot as plt
 
-def run(symbol, data=None):
-    """
-    參數說明：
-    - symbol: 股票代碼（字串）
-    - data: 預先抓好的 DataFrame，若 None 則嘗試自行抓取（範例中沒有內建抓資料功能）
-
-    回傳值：
-    - 加入了 volume_ma20、volume_std20、zscore_volume 的 DataFrame
-    """
-
-    # 假設外部已經提供 data，且欄位有 Volume
-    if data is None:
-        st.warning("⚠️ 請提供包含 Volume 欄位的 DataFrame")
-        return None
-
-    # 先確認必須欄位
+def run(symbol, data):
+    # 確認有 Volume 欄位
     if "Volume" not in data.columns:
-        st.warning("⚠️ 欄位 Volume 不存在，無法計算指標")
-        return None
+        raise ValueError("⚠️ 請提供包含 Volume 欄位的 DataFrame")
 
-    # 計算20日移動平均與標準差
+    # 計算 20 天成交量移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 準備 dropna 的欄位列表，並確定這些欄位在 data 中存在
-    subset_cols = ["volume_ma20", "volume_std20"]
-    existing_cols = [col for col in subset_cols if col in data.columns]
+    # 檢查是否成功計算出需要的欄位
+    required_cols = ["volume_ma20", "volume_std20"]
+    missing_cols = [col for col in required_cols if col not in data.columns]
+    if missing_cols:
+        raise ValueError(f"⚠️ 無法計算移動平均，欄位遺失: {missing_cols}")
 
-    if len(existing_cols) < len(subset_cols):
-        missing = list(set(subset_cols) - set(existing_cols))
-        st.warning(f"⚠️ 欄位缺失無法計算：{missing}")
-        return None
-
-    # 去除在這些欄位中有缺失值的列，避免計算錯誤
-    data = data.dropna(subset=existing_cols).copy()
+    # 先剔除計算 z-score 需要的欄位有 NaN 的列，避免錯誤
+    data_clean = data.dropna(subset=required_cols + ["Volume"]).copy()
 
     # 計算 z-score volume
-    # 用 try-except 防止除以零或 NaN 引發錯誤
-    try:
-        data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    except Exception as e:
-        st.warning(f"⚠️ 計算 z-score volume 時發生錯誤: {e}")
-        return None
+    data_clean["zscore_volume"] = (data_clean["Volume"] - data_clean["volume_ma20"]) / data_clean["volume_std20"]
 
-    # 回傳處理後的 DataFrame
-    return data
+    # 畫圖展示 Volume 和 z-score_volume
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12,8), sharex=True)
+
+    ax1.bar(data_clean.index, data_clean["Volume"], color="lightblue")
+    ax1.set_title(f"{symbol} 成交量")
+    ax1.set_ylabel("Volume")
+
+    ax2.plot(data_clean.index, data_clean["zscore_volume"], color="red")
+    ax2.axhline(0, color="black", linestyle="--")
+    ax2.set_title(f"{symbol} 成交量 Z-Score")
+    ax2.set_ylabel("Z-Score")
+
+    plt.tight_layout()
+    plt.show()
+
+    return data_clean  # 回傳計算後資料方便後續使用
