@@ -13,26 +13,27 @@ def run(symbol: str):
         st.error("❌ 無法下載股價資料或成交量資料缺失")
         return
 
-    # 避免重複執行造成欄位名稱不存在錯誤
-    if "volume_ma20" not in data.columns:
+    # 計算 20MA 與 20STD
+    try:
         data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-    if "volume_std20" not in data.columns:
         data["volume_std20"] = data["Volume"].rolling(window=20).std()
+    except Exception as e:
+        st.error(f"❌ 移動平均計算錯誤: {e}")
+        return
 
-    # 再次確認欄位建立成功
+    # 並排檢查欄位與 dropna（保證欄位存在才 drop）
     if "volume_ma20" not in data.columns or "volume_std20" not in data.columns:
-        st.error("❌ 無法計算移動平均與標準差")
+        st.error("❌ 必要欄位缺失，無法繼續分析")
         return
 
-    # 先 dropna（但加上欄位是否存在的檢查）
-    valid_cols = [col for col in ["volume_ma20", "volume_std20"] if col in data.columns]
-    data = data.dropna(subset=valid_cols)
+    data = data.dropna().copy()  # 安全地刪除任何 NA 資料
 
+    # 再確認資料夠用
     if data.empty:
-        st.warning("⚠️ 資料不足，請選擇更長的時間區間")
+        st.warning("⚠️ 有效資料不足，請選更長的區間")
         return
 
-    # 計算Z-score與異常點
+    # 計算 Z-score
     data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
     data["anomaly"] = data["zscore_volume"].abs() > 2
 
