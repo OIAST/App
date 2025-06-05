@@ -1,30 +1,37 @@
 import streamlit as st
 import pandas as pd
 
-def run(symbol, data):
-    st.subheader("📊 技術指標：Z-score 成交量")
+def run(symbol: str, data: pd.DataFrame):
+    st.subheader(f"📊 技術面分析 - {symbol}")
 
-    try:
-        # ✅ 計算移動平均與標準差
-        data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-        data["volume_std20"] = data["Volume"].rolling(window=20).std()
+    # 檢查 Volume 是否存在
+    if "Volume" not in data.columns:
+        st.error("❌ 無法進行分析，資料缺少 Volume 欄位")
+        st.dataframe(data.head())
+        return
 
-        # ✅ 避免 KeyError
-        required_cols = ["Volume", "volume_ma20", "volume_std20"]
-        missing = [col for col in required_cols if col not in data.columns]
-        if missing:
-            st.warning(f"⚠️ 欄位遺失：{missing}")
-            return
+    # 計算移動平均與標準差
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-        # ✅ 避免 ValueError（NaN 導致 z-score 無法計算）
-        data = data.dropna(subset=required_cols).copy()
-        if data.empty:
-            st.warning("⚠️ 沒有足夠的有效資料來計算 Z-score")
-            return
+    required_cols = ["Volume", "volume_ma20", "volume_std20"]
+    missing_cols = [col for col in required_cols if col not in data.columns]
 
-        # ✅ 計算 z-score
-        data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-        st.line_chart(data["zscore_volume"])
+    if missing_cols:
+        st.warning(f"⚠️ 缺少必要欄位：{missing_cols}")
+        return
 
-    except Exception as e:
-        st.error(f"❌ 錯誤發生：{e}")
+    # 避免 NaN 錯誤
+    data_clean = data.dropna(subset=required_cols).copy()
+    if data_clean.empty:
+        st.warning("⚠️ 無法計算 z-score，可能是資料不足")
+        return
+
+    # 計算 Z-score
+    data_clean["zscore_volume"] = (
+        (data_clean["Volume"] - data_clean["volume_ma20"]) / data_clean["volume_std20"]
+    )
+
+    # 顯示結果
+    st.line_chart(data_clean[["Volume", "volume_ma20"]])
+    st.line_chart(data_clean["zscore_volume"])
