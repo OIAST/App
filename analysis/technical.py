@@ -5,35 +5,29 @@ import streamlit as st
 import plotly.graph_objs as go
 
 def run(symbol):
-    # 下載股價資料
+    # 抓資料
     data = yf.download(symbol, period="3mo", interval="1d", auto_adjust=True)
 
     if data.empty or "Volume" not in data.columns:
         st.error("⚠️ 無法取得股價或成交量資料")
         return
 
-    # 僅保留需要欄位，轉換為 Series
-    volume = data["Volume"].astype(float)
+    # 計算量的移動平均與標準差
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 rolling 統計值
-    volume_ma20 = volume.rolling(window=20).mean()
-    volume_std20 = volume.rolling(window=20).std()
+    # 只有在欄位真的存在時才 dropna
+    expected_cols = ["volume_ma20", "volume_std20"]
+    available_cols = [col for col in expected_cols if col in data.columns]
 
-    # 組回 dataframe
-    data = data.copy()
-    data["volume_ma20"] = volume_ma20
-    data["volume_std20"] = volume_std20
+    if not available_cols:
+        st.error("⚠️ 必要欄位不存在，無法計算 z-score")
+        return
 
-    # 濾掉無效值
-    data = data.dropna(subset=["volume_ma20", "volume_std20"])
+    data = data.dropna(subset=available_cols)
 
-    # 再次保證型別正確
-    v = data["Volume"].astype(float)
-    ma = data["volume_ma20"].astype(float)
-    std = data["volume_std20"].astype(float)
-
-    # z-score 計算
-    data["zscore_volume"] = (v - ma) / std
+    # 再保證沒有 NAN 才做計算
+    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
 
     # 畫圖
     fig = go.Figure()
