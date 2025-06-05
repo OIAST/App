@@ -16,39 +16,36 @@ def run(symbol):
             return
 
         if "Volume" not in data.columns:
-            st.error("❌ 沒有成交量資料 (Volume)")
-            st.write("實際欄位：", list(data.columns))
+            st.error("❌ 沒有成交量資料")
             return
 
-        # 計算移動平均與標準差
+        # 計算 volume_ma20 與 volume_std20
         data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
         data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-        # 檢查欄位是否真的建立成功
-        if "volume_ma20" not in data.columns or "volume_std20" not in data.columns:
-            st.error("❌ volume_ma20 或 volume_std20 欄位未成功建立")
+        # 安全檢查欄位是否存在
+        missing_cols = [col for col in ["volume_ma20", "volume_std20"] if col not in data.columns]
+        if missing_cols:
+            st.error(f"⚠️ 欄位遺失：{missing_cols}")
+            st.write("目前欄位：", data.columns.tolist())
             return
 
-        # 顯示有 NaN 的狀態給你確認
-        nan_stats = data[["Volume", "volume_ma20", "volume_std20"]].isna().sum()
-        st.write("❕ NaN 檢查：", nan_stats.to_dict())
-
-        # 過濾掉 NaN
-        data = data.dropna(subset=["volume_ma20", "volume_std20"])
+        # 移除 NaN 資料：但前提是欄位真的有存在
+        subset_cols = [col for col in ["volume_ma20", "volume_std20"] if col in data.columns]
+        data = data.dropna(subset=subset_cols)
         if data.empty:
-            st.warning("⚠️ 所有資料都是 NaN，無法分析")
+            st.warning("⚠️ 無足夠資料進行分析（可能是前20天都被 drop 掉）")
             return
 
-        # 計算 z-score
-        data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-        if data["zscore_volume"].isna().all():
-            st.error("❌ Z-Score 計算結果為全 NaN")
-            return
+        # 計算 z-score，這邊改用 .get 確保欄位存在
+        data["zscore_volume"] = (
+            (data["Volume"] - data.get("volume_ma20", 0)) / data.get("volume_std20", 1)
+        )
 
-        # 顯示結果表格
+        # 顯示結果
         st.dataframe(data[["Close", "Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(10))
 
-        # 畫圖
+        # 繪圖
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=data.index, y=data["zscore_volume"], name="Z-Score"))
         fig.add_trace(go.Scatter(x=data.index, y=[2]*len(data), name="+2σ", line=dict(dash='dash', color='red')))
@@ -57,5 +54,5 @@ def run(symbol):
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error("❌ 程式發生錯誤")
+        st.error("❌ 發生錯誤")
         st.exception(e)
