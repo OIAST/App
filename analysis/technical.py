@@ -22,6 +22,6 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 顯示前 30 筆資料供檢查
-    st.write("📋 計算結果（近30日）")
-    st.dataframe(data[["Volume", "volume_ma20", "volume_std20"]].tail(30))
+    # 顯示近 90 日資料
+    st.write("📋 計算結果（近90日）")
+    st.dataframe(data[["Volume", "volume_ma20", "volume_std20"]].tail(90))
