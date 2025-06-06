@@ -1,11 +1,21 @@
 import yfinance as yf
 import streamlit as st
+from datetime import datetime, timedelta
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # ✅ 抓取 6 個月的日線資料（確保足夠資料用來計算 20 日均量與標準差）
-    data = yf.download(symbol, period="6mo", interval="1d", progress=False)
+    # ✅ 明確指定開始與結束日期（避免 yfinance 自動壓縮資料）
+    end_date = datetime.today()
+    start_date = end_date - timedelta(days=180)
+
+    data = yf.download(
+        symbol,
+        start=start_date.strftime("%Y-%m-%d"),
+        end=end_date.strftime("%Y-%m-%d"),
+        interval="1d",
+        progress=False
+    )
 
     # 檢查資料是否成功取得
     if data.empty:
