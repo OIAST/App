@@ -31,16 +31,21 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 Z-score（需處理除以 0 的狀況）
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    data["zscore_volume"] = data["zscore_volume"].replace([float("inf"), float("-inf")], pd.NA)
+    # 安全計算 Z-score，只對標準差非零的地方計算
+    data["zscore_volume"] = None
+    valid = data["volume_std20"] != 0
+    data.loc[valid, "zscore_volume"] = (
+        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    )
 
     # 顯示表格（縮寫 Volume）
     display_df = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
     display_df["Volume"] = display_df["Volume"].apply(format_volume)
     display_df["volume_ma20"] = display_df["volume_ma20"].apply(format_volume)
     display_df["volume_std20"] = display_df["volume_std20"].apply(format_volume)
-    display_df["zscore_volume"] = display_df["zscore_volume"].round(2)
+    display_df["zscore_volume"] = display_df["zscore_volume"].apply(
+        lambda x: "-" if pd.isna(x) else round(x, 2)
+    )
 
     st.write("📋 近期量能與 Z-score 表：")
     st.dataframe(display_df.tail(30))
@@ -48,7 +53,8 @@ def run(symbol):
     # 繪圖（Z-score 折線圖）
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=data.index, y=data["zscore_volume"],
+        x=data.index,
+        y=data["zscore_volume"],
         mode="lines+markers",
         name="Z-Score (Volume)"
     ))
