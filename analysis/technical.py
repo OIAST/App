@@ -1,14 +1,14 @@
 import yfinance as yf
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 1. 抓資料（6個月）
+    # 1. 抓取 6 個月日線資料
     data = yf.download(symbol, period="6mo", interval="1d", progress=False)
 
+    # 資料檢查
     if data.empty:
         st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
         return
@@ -20,19 +20,16 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 3. 計算 Z-score：成交量偏離程度
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 3. 計算 Z-score（含錯誤防呆）
+    mask = data["volume_std20"].notnull() & (data["volume_std20"] != 0)
+    data.loc[mask, "zscore_volume"] = (
+        (data.loc[mask, "Volume"] - data.loc[mask, "volume_ma20"]) / data.loc[mask, "volume_std20"]
+    )
 
-    # 4. 顯示資訊確認
-    st.write(f"✅ 共 {len(data)} 筆資料")
-    st.write(f"日期範圍：{data.index.min().date()} ～ {data.index.max().date()}")
-    st.dataframe(data.tail(10))  # 顯示最後10筆
+    # 4. 顯示指標資料
+    st.write("✅ 前 30 筆計算結果：")
+    st.dataframe(data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30))
 
-    # 5. 畫圖：Z-score Volume
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=data.index, y=data["zscore_volume"],
-                             mode="lines", name="Z-score Volume"))
-    fig.update_layout(title="Z-score Volume（20日）",
-                      xaxis_title="日期", yaxis_title="Z-score",
-                      height=400)
-    st.plotly_chart(fig, use_container_width=True)
+    # 5. 顯示原始資料
+    with st.expander("📄 查看完整原始資料"):
+        st.dataframe(data.tail(100))
