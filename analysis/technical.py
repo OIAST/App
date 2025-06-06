@@ -5,26 +5,27 @@ import plotly.graph_objs as go
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 直接從 yfinance 抓一次完整資料即可，這會由主程式統一提供
+    # 抓六個月日線資料
     data = yf.download(symbol, period="6mo", interval="1d", progress=False)
 
     if data.empty or "Volume" not in data.columns:
         st.error("⚠️ 無法取得有效資料或資料中缺少 Volume 欄位。")
         return
 
-    # 這裡不用檢查 NaN，直接信任 data 完整性，從已有欄位處理
+    # 計算 MA20 與 Std20，並避免 NaN 的資料被立即使用
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
 
-    # 如果真的有極端狀況欄位不存在，這裡才提醒
-    required_cols = ["Volume", "volume_ma20", "volume_std20", "zscore_volume"]
-    for col in required_cols:
-        if col not in data.columns:
-            st.error(f"⚠️ 缺少欄位：{col}，請確認資料是否完整。")
-            return
+    # 安全方式：建立新欄位前先過濾出合法資料
+    mask = data["volume_std20"].notna()
+    data.loc[mask, "zscore_volume"] = (data.loc[mask, "Volume"] - data.loc[mask, "volume_ma20"]) / data.loc[mask, "volume_std20"]
 
-    # 繪圖
+    # 如果還是找不到 zscore_volume，錯誤提醒
+    if "zscore_volume" not in data.columns:
+        st.error("⚠️ 無法正確計算 z-score，可能因為資料不足。")
+        return
+
+    # Plotly 繪圖
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
@@ -61,4 +62,6 @@ def run(symbol):
     )
 
     st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(data[required_cols].tail(30))
+
+    # 顯示最後 30 筆資料
+    st.dataframe(data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30))
