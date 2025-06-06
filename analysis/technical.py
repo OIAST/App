@@ -2,20 +2,22 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
-def format_volume(v):
+def format_volume(volume):
+    """將成交量數字轉為含萬單位（例：12.3 萬）"""
     try:
-        if v >= 1_0000:
-            return f"{v / 1_0000:.2f}萬"
+        volume = float(volume)
+        if volume >= 10_000:
+            return f"{volume / 10000:.1f} 萬"
         else:
-            return f"{v:,.0f}"
+            return f"{volume:.0f}"
     except:
-        return v
+        return volume
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 1. 下載一年資料
-    data = yf.download(symbol, period="1y", interval="1d", progress=False)
+    # 抓取近 90 天日線資料
+    data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
     if data.empty:
         st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
@@ -25,19 +27,25 @@ def run(symbol):
         st.error("⚠️ 資料中缺少 Volume 欄位。")
         return
 
-    # 2. 計算 20MA 與 20STD
+    # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 3. 計算 Z-score，不使用 dropna
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 計算 z-score（只套用在有完整資料的 row 上）
+    if all(col in data.columns for col in ["Volume", "volume_ma20", "volume_std20"]):
+        valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
+        zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
+        data.loc[valid.index, "zscore_volume"] = zscore
+    else:
+        st.warning("⚠️ 缺少欄位，無法計算 Z-score")
 
-    # 4. 顯示最近 30 筆資料
-    display_data = data.tail(30).copy()
+    # 建立顯示用的 DataFrame（轉換成交量格式）
+    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
+    display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
+    display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
+    display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    st.write("✅ 近 30 日 Volume 資訊：")
-    st.dataframe(display_data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]])
-
-    # 5. 畫圖（90 日）
-    st.line_chart(data[["zscore_volume"]].tail(90))
+    # 顯示最近 30 筆資料
+    st.write("📈 成交量與 Z-score（近 30 日）")
+    st.dataframe(display_data.tail(30))
