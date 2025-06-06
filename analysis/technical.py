@@ -19,9 +19,6 @@ def run(symbol):
         st.error("⚠️ 資料中缺少 Volume 欄位。")
         return
 
-    if data["Volume"].isna().all():
-        st.error("⚠️ Volume 欄位皆為空值，無法分析。")
-        return
 
     # 顯示前幾筆資料供確認
     st.write("✅ 資料成功載入，前幾筆如下：")
