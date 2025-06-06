@@ -15,18 +15,18 @@ def run(symbol):
     # 抓取一年資料
     data = yf.download(symbol, period="1y", interval="1d", progress=False)
 
-    # 檢查資料與 Volume 欄位
     if data.empty or "Volume" not in data.columns:
         st.error("⚠️ 資料錯誤或缺少 Volume 欄位。")
         return
 
-    # 計算技術指標
+    # 技術指標
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # z-score：確保所有參與欄位都為 Series 且長度對齊
-    zscore = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    data["zscore_volume"] = zscore
+    # 安全計算 z-score
+    valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
+    zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
+    data["zscore_volume"] = pd.Series(zscore, index=valid.index)
 
     # 格式化顯示
     display_df = data.copy()
@@ -37,7 +37,6 @@ def run(symbol):
         lambda x: f"{x:.2f}" if pd.notna(x) else "-"
     )
 
-    # 顯示近 30 筆資料
     st.write("📈 Volume Z-score 分析（近 30 日）")
     st.dataframe(
         display_df[[
