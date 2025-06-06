@@ -1,67 +1,50 @@
 import yfinance as yf
-import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-
+import streamlit as st
 
 def format_volume(val):
-    """將數值自動縮寫，例如：23000 ➜ 2.3萬"""
-    if pd.isna(val):
+    try:
+        val = float(val)
+        return f"{val/10000:.1f}萬" if val >= 10000 else f"{val:.0f}"
+    except:
         return "-"
-    if val >= 1_0000:
-        return f"{val / 10000:.1f}萬"
-    return str(int(val))
-
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 抓取一年資料
+    # 取得一年日線資料
     data = yf.download(symbol, period="1y", interval="1d", progress=False)
 
-    if data.empty:
-        st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
+    # 確認資料是否有效
+    if data.empty or "Volume" not in data.columns:
+        st.error("⚠️ 無法取得資料或缺少 Volume 欄位。")
         return
 
-    if "Volume" not in data.columns:
-        st.error("⚠️ 資料中缺少 Volume 欄位。")
-        return
-
-    # 計算 20MA 與標準差
+    # 計算技術指標
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 安全計算 Z-score，只對標準差非零的地方計算
-    data["zscore_volume"] = None
-    valid = data["volume_std20"] != 0
-    data.loc[valid, "zscore_volume"] = (
-        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 建立一個 dataframe 儲存顯示用欄位，先篩掉前20筆無法計算的行
+    display_data = data.dropna(subset=["volume_ma20", "volume_std20"]).copy()
+
+    # 安全計算 zscore（避免出錯）
+    display_data["zscore_volume"] = (
+        (display_data["Volume"] - display_data["volume_ma20"]) / display_data["volume_std20"]
+    ).round(2)
+
+    # 格式化欄位加上「萬」
+    display_data["Volume_fmt"] = display_data["Volume"].apply(format_volume)
+    display_data["volume_ma20_fmt"] = display_data["volume_ma20"].apply(format_volume)
+    display_data["volume_std20_fmt"] = display_data["volume_std20"].apply(format_volume)
+    display_data["zscore_volume_fmt"] = display_data["zscore_volume"].apply(
+        lambda x: f"{x:.2f}" if pd.notna(x) else "-"
     )
 
-    # 顯示表格（縮寫 Volume）
-    display_df = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
-    display_df["Volume"] = display_df["Volume"].apply(format_volume)
-    display_df["volume_ma20"] = display_df["volume_ma20"].apply(format_volume)
-    display_df["volume_std20"] = display_df["volume_std20"].apply(format_volume)
-    display_df["zscore_volume"] = display_df["zscore_volume"].apply(
-        lambda x: "-" if pd.isna(x) else round(x, 2)
+    # 顯示結果（近30日）
+    st.write("📈 Volume Z-score 分析（近 30 日）")
+    st.dataframe(
+        display_data[[
+            "Volume_fmt", "volume_ma20_fmt", "volume_std20_fmt", "zscore_volume_fmt"
+        ]].tail(30),
+        use_container_width=True
     )
-
-    st.write("📋 近期量能與 Z-score 表：")
-    st.dataframe(display_df.tail(30))
-
-    # 繪圖（Z-score 折線圖）
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data["zscore_volume"],
-        mode="lines+markers",
-        name="Z-Score (Volume)"
-    ))
-    fig.update_layout(
-        title="Z-Score（成交量）",
-        xaxis_title="日期",
-        yaxis_title="Z-Score",
-        height=400
-    )
-    st.plotly_chart(fig, use_container_width=True)
