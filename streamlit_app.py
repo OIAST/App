@@ -33,8 +33,6 @@ else:
     elif analysis_type == "基本面":
         fundamental.run(symbol)
     elif analysis_type == "技術面":
-        import yfinance as yf
-        data = yf.download(symbol, period="3mo", interval="1d", auto_adjust=True)
-        technical.run(symbol, data)
+        technical.run(symbol)
     elif analysis_type == "股價機率分析":
         probability.run(symbol)
