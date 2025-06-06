@@ -16,6 +16,8 @@ def run(symbol):
         interval="1d",
         progress=False
     )
+    
+    
 
     # 檢查資料是否成功取得
     if data.empty:
