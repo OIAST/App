@@ -13,42 +13,43 @@ def run(symbol):
         st.error("⚠️ 無法取得有效資料或資料中缺少 Volume 欄位。")
         return
 
-    # 計算技術指標
+    # 計算 MA20 與 STD20
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
 
-    # 清理 NaN
-    data.dropna(subset=["volume_ma20", "volume_std20", "zscore_volume"], inplace=True)
+    # ✅ 只在資料充足時計算 Z-score
+    data_filtered = data.dropna(subset=["volume_ma20", "volume_std20"]).copy()
+    data_filtered["zscore_volume"] = (
+        (data_filtered["Volume"] - data_filtered["volume_ma20"]) / data_filtered["volume_std20"]
+    )
 
-    # 繪圖：Volume + MA
+    # 繪圖
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        x=data.index,
-        y=data["Volume"],
+        x=data_filtered.index,
+        y=data_filtered["Volume"],
         name="Volume",
         marker_color="rgba(158,202,225,0.6)",
         yaxis="y1"
     ))
 
     fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data["volume_ma20"],
+        x=data_filtered.index,
+        y=data_filtered["volume_ma20"],
         name="MA20",
         line=dict(color="blue"),
         yaxis="y1"
     ))
 
     fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data["zscore_volume"],
+        x=data_filtered.index,
+        y=data_filtered["zscore_volume"],
         name="Z-Score",
         line=dict(color="red", dash="dot"),
         yaxis="y2"
     ))
 
-    # 設定雙 Y 軸
     fig.update_layout(
         title=f"{symbol} Volume 與 Z-Score",
         xaxis_title="日期",
@@ -69,5 +70,5 @@ def run(symbol):
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # 顯示資料表供比對
-    st.dataframe(data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30))
+    # 顯示資料供驗證
+    st.dataframe(data_filtered[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30))
