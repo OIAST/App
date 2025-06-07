@@ -1,39 +1,48 @@
-import yfinance as yf
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 
-def run(symbol):
-    st.subheader(f"📊 技術面分析（含 Z-score）：{symbol}")
+# Z-score 計算邏輯，避開 NaN 與除以 0 問題
+def safe_zscore(row):
+    vol = row["Volume"]
+    ma = row["volume_ma20"]
+    std = row["volume_std20"]
+    if pd.isna(vol) or pd.isna(ma) or pd.isna(std) or std == 0:
+        return float("nan")
+    return (vol - ma) / std
 
-    # 抓取近 90 天日線資料
+# 主分析函式
+def run(symbol):
+    st.subheader(f"📊 技術面分析：{symbol}")
+
+    # 抓取近 90 天資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
-    if data.empty or "Volume" not in data.columns:
-        st.error("⚠️ 無法取得資料或缺少 Volume 欄位。")
+    if data.empty:
+        st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
         return
 
-    # ⛳ 將 Volume 轉為 float，避免 int 與 float 衝突
-    data["Volume"] = data["Volume"].astype(float)
+    # 顯示原始 Volume 資料型別（用於 debug）
+    st.write("📌 Volume 原始資料類型：", str(type(data["Volume"].iloc[-1])))
 
-    # 計算 20 日移動平均與標準差
+    # 計算 20 日均量與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 Z-score，確保無法計算時為 NaN
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 計算 Z-score，避開錯誤
+    data["zscore_volume"] = data.apply(safe_zscore, axis=1)
 
-    # 顯示最近 30 筆資料
+    # 顯示最近 30 筆資料（含 Z-score）
     st.write("📈 成交量統計與 Z-score（近 30 日）")
-    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30)
-    st.dataframe(display_data)
+    display_cols = ["Volume", "volume_ma20", "volume_std20", "zscore_volume"]
+    display_data = data[display_cols].copy()
+    display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    # 顯示每欄位的資料型別
-    st.write("📋 資料欄位型別")
-    st.code(str(display_data.dtypes), language="python")
+    st.dataframe(display_data.tail(30))
 
-    # 顯示前三筆原始數值
-    st.write("🔍 欄位數值預覽")
-    st.code("Volume:\n" + str(display_data["Volume"].head(3)) + "\n\n" +
-            "volume_ma20:\n" + str(display_data["volume_ma20"].head(3)) + "\n\n" +
-            "volume_std20:\n" + str(display_data["volume_std20"].head(3)) + "\n\n" +
-            "zscore_volume:\n" + str(display_data["zscore_volume"].head(3)))
+# Streamlit UI
+st.title("📈 股票技術面分析工具")
+symbol = st.text_input("請輸入股票代碼（如：AAPL、TSLA、2330.TW）：", value="2330.TW")
+
+if symbol:
+    run(symbol)
