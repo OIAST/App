@@ -1,62 +1,62 @@
-import streamlit as st
 import yfinance as yf
+import streamlit as st
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import pandas as pd
 
-st.set_page_config(layout="wide")
+def run(symbol):
+    st.subheader(f"📊 技術面分析：{symbol}")
 
-st.title("成交量與股價技術分析")
+    analysis_option = st.selectbox(
+        "選擇技術分析類型",
+        ["統計量化分析", "A", "B", "C"]
+    )
+    st.write(f"目前選擇：{analysis_option}")
 
-# 參數設定
-ticker = "AAPL"
-period_days = 90
+    analysis_descriptions = {
+        "統計量化分析": (
+            "此分析包含成交量、20日均線及其標準差的變動率，幫助判斷成交量波動性及股價走勢，"
+            "量能若與STD標準差同上代表市場熱度高，反之則代表大戶離場或市場減熱，"
+            "另外ma均線提供長期量能，若量能低於均線，代表市場可能趨於保守。"
+        ),
+        "A": "選項 A 的分析說明，待補充。",
+        "B": "選項 B 的分析說明，待補充。",
+        "C": "選項 C 的分析說明，待補充。",
+    }
+    st.markdown(f"**分析說明：** {analysis_descriptions.get(analysis_option, '無說明')}")
 
-# 抓取資料
-data = yf.download(ticker, period=f"{period_days}d", interval="1d")
+    data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
-# 計算成交量 20 日均線與標準差
-data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
-data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-# 清理 NaN 用於繪圖
-vol_ma_df = data[["Volume", "volume_ma20"]].dropna()
-std_df = data["volume_std20"].dropna()
 
-# 圖片大小
-fig_size = (10, 4)
+你的分析理論很有道理，整理一下我理解的重點：
 
-# 兩圖並排
-col1, col2 = st.columns(2)
+1. **成交量與20日均線（MA）**：  
+   - MA 是成交量的長期趨勢指標，代表市場的平均活躍度。  
+   - 如果成交量低於 MA，表示市場整體趨於保守、成交冷清。
 
-with col1:
-    fig_vol_ma, ax_vol_ma = plt.subplots(figsize=fig_size)
-    ax_vol_ma.plot(vol_ma_df.index, vol_ma_df["Volume"], label="Volume", color="blue")
-    ax_vol_ma.plot(vol_ma_df.index, vol_ma_df["volume_ma20"], label="20-day MA", color="orange")
-    ax_vol_ma.set_title("Volume & 20-day MA")
-    ax_vol_ma.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-    plt.setp(ax_vol_ma.get_xticklabels(), rotation=45, fontsize=8)
-    ax_vol_ma.legend()
-    ax_vol_ma.grid(True)
-    st.pyplot(fig_vol_ma)
+2. **成交量的20日標準差（STD）與變動率**：  
+   - STD 代表成交量波動的強弱。  
+   - 如果成交量和STD 同時上升，表示成交量的波動性大且成交量高，代表市場熱度高、資金活躍。  
+   - 如果成交量和STD 同時下降或分歧，則可能是大戶離場、資金冷卻，市場減熱。
 
-with col2:
-    fig_std, ax_std = plt.subplots(figsize=fig_size)
-    ax_std.plot(std_df.index, std_df, label="20-day Std Dev", color="green")
-    ax_std.set_title("20-day Std Dev")
-    ax_std.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-    plt.setp(ax_std.get_xticklabels(), rotation=45, fontsize=8)
-    ax_std.legend()
-    ax_std.grid(True)
-    st.pyplot(fig_std)
+3. **整合判斷**：  
+   - 量能與STD同向上 → 市場熱度高、資金活躍。  
+   - 量能與STD背離或下降 → 市場降溫、資金撤退。  
+   - 量能低於20日均線 → 市場趨於保守。
 
-# 單獨股價折線圖
-st.subheader("股價走勢圖")
-fig_price, ax_price = plt.subplots(figsize=(20, 4))
-ax_price.plot(data.index, data["Close"], label="Close Price", color="purple")
-ax_price.set_title(f"{ticker} Close Price")
-ax_price.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-plt.setp(ax_price.get_xticklabels(), rotation=45, fontsize=8)
-ax_price.legend()
-ax_price.grid(True)
-st.pyplot(fig_price)
+這套判斷邏輯屬於常見的量能分析思路，核心在「成交量的波動幅度（STD）」與「量能本身（成交量及均線）」的配合觀察。
+
+---
+
+### 我建議的補充或提醒：
+
+- **STD數值本身不說明方向**，只是波動幅度，配合量能的上升或下降趨勢來判斷熱度。  
+- 你也可以觀察STD的變化率（即STD的斜率），增減趨勢更能提示市場活躍度變化。  
+- 若要更嚴謹，可以加入價格走勢（如均線趨勢）一起佐證量能的強弱，避免單純量能波動誤判。  
+
+---
+
+### 總結：
+
+你的理論很合理，量能與其波動性的聯合分析確實是判斷市場熱度和資金動向的好方法，且20日均線有助於觀察長期趨勢，STD幫你了解波動幅度，兩者搭配能獲得比較全面的訊號。
+
+如果你有需要，我可以幫你設計更細緻的量能指標計算或示意圖說明，甚至用程式實作分析工具也可以。你覺得呢？
