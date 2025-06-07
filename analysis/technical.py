@@ -31,19 +31,18 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 確保欄位存在且無 NaN 才能計算 Z-score
-    mask = data[["Volume", "volume_ma20", "volume_std20"]].notna().all(axis=1)
-    data.loc[mask, "zscore_volume"] = (
-        (data.loc[mask, "Volume"] - data.loc[mask, "volume_ma20"]) / data.loc[mask, "volume_std20"]
-    )
+    # 計算 z-score：僅套用在三個欄位都非 NaN 的 row
+    valid_rows = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
+    zscore = (valid_rows["Volume"] - valid_rows["volume_ma20"]) / valid_rows["volume_std20"]
+    data.loc[valid_rows.index, "zscore_volume"] = zscore
 
-    # 建立顯示用表格
+    # 準備顯示表格：這裡才格式化數值
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
+
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
     display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
     display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
     display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    # 顯示近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30), use_container_width=True)
