@@ -1,6 +1,7 @@
 import yfinance as yf
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
@@ -16,11 +17,19 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 直接計算 Z-score，不做條件檢查
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    data["zscore_volume"] = data["zscore_volume"].round(2)
+    # 防止 NaN 錯誤：只有當三個欄位都有值時才計算 Z-score
+    condition = (
+        data["Volume"].notnull() &
+        data["volume_ma20"].notnull() &
+        data["volume_std20"].notnull()
+    )
+    data["zscore_volume"] = np.where(
+        condition,
+        ((data["Volume"] - data["volume_ma20"]) / data["volume_std20"]).round(2),
+        np.nan
+    )
 
-    # 顯示最近 30 筆資料（不轉換單位）
+    # 顯示最近 30 筆資料
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30)
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data)
