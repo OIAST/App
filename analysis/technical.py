@@ -3,10 +3,10 @@ import streamlit as st
 import pandas as pd
 
 def format_volume(volume):
-    """將成交量轉換為含萬單位格式（例：12.3 萬）"""
+    """將成交量轉換成含萬的格式"""
     try:
         volume = float(volume)
-        if volume >= 10000:
+        if volume >= 10_000:
             return f"{volume / 10000:.1f} 萬"
         else:
             return f"{volume:.0f}"
@@ -16,7 +16,7 @@ def format_volume(volume):
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 下載資料
+    # 下載近 90 天的日線資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
     if data.empty:
@@ -24,26 +24,25 @@ def run(symbol):
         return
 
     if "Volume" not in data.columns:
-        st.error("⚠️ 資料中缺少 Volume 欄位。")
+        st.error("⚠️ 此股票無成交量資料。")
         return
 
-    # 計算 MA 與 STD
+    # 計算 20 日平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # dropna 後計算 zscore_volume
-    valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
+    # 計算 zscore_volume，只對有值的行計算
+    valid = data.dropna(subset=["Volume", "volume_ma20", "volume_std20"])
     zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
-    data["zscore_volume"] = pd.NA  # 先建立欄位
     data.loc[valid.index, "zscore_volume"] = zscore
 
-    # 顯示用 DataFrame，不修改原始 data（避免文字污染數值）
+    # 建立顯示用 DataFrame
     display_data = data.copy()
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
     display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
     display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
-    display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
+    display_data["zscore_volume"] = pd.to_numeric(display_data["zscore_volume"], errors="coerce").round(2)
 
-    # 顯示近 30 筆資料
+    # 顯示最近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
-    st.dataframe(display_data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30), use_container_width=True)
+    st.dataframe(display_data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30))
