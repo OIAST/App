@@ -2,21 +2,10 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
-def format_volume(volume):
-    """將成交量轉換成含萬的格式"""
-    try:
-        volume = float(volume)
-        if volume >= 10_000:
-            return f"{volume / 10000:.1f} 萬"
-        else:
-            return f"{volume:.0f}"
-    except:
-        return volume
-
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 抓取 90 天日線資料
+    # 抓取近 90 天日線資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
     if data.empty:
@@ -27,22 +16,33 @@ def run(symbol):
         st.error("⚠️ 資料中缺少 Volume 欄位。")
         return
 
-    # 計算 20MA 和 20STD
+    # 強制轉換成數值格式（避免因格式錯誤導致計算失敗）
+    data["Volume"] = pd.to_numeric(data["Volume"], errors="coerce")
+
+    # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 直接計算 zscore_volume，NaN 自動處理掉
-    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    # 再次確保這三欄都是數值格式
+    data["volume_ma20"] = pd.to_numeric(data["volume_ma20"], errors="coerce")
+    data["volume_std20"] = pd.to_numeric(data["volume_std20"], errors="coerce")
 
-    # 顯示用 DataFrame
+    # 建立條件篩選，只對有數值 & std ≠ 0 的資料做 Z-score 計算
+    mask = (
+        data["volume_ma20"].notna() &
+        data["volume_std20"].notna() &
+        (data["volume_std20"] != 0)
+    )
+
+    # 計算 Z-score 並寫入欄位
+    data.loc[mask, "zscore_volume"] = (
+        (data.loc[mask, "Volume"] - data.loc[mask, "volume_ma20"]) / data.loc[mask, "volume_std20"]
+    )
+
+    # 建立顯示用表格
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
-    display_data["Volume"] = display_data["Volume"].apply(format_volume)
-    display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
-    display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
+    display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    # 確保 zscore 是數字格式再四捨五入
-    display_data["zscore_volume"] = pd.to_numeric(display_data["zscore_volume"], errors="coerce").round(2)
-
-    # 顯示
+    # 顯示最近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30))
