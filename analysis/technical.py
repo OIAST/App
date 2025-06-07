@@ -4,71 +4,72 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 def run(symbol):
-    st.subheader(f"📊 技術面分析：{symbol}")
+    st.subheader(f"📊 Technical Analysis: {symbol}")
 
     analysis_option = st.selectbox(
-        "選擇技術分析類型",
-        ["統計量化分析", "A", "B", "C"]
+        "Select Technical Analysis Type",
+        ["Quantitative Analysis", "A", "B", "C"]
     )
-    st.write(f"目前選擇：{analysis_option}")
+    st.write(f"Current Selection: {analysis_option}")
 
     analysis_descriptions = {
-        "統計量化分析": (
-            "此分析包含成交量、20日均線及其標準差的變動率，幫助判斷成交量波動性及股價走勢，"
-            "量能若與STD標準差同上代表市場熱度高，反之則代表大戶離場或市場減熱，"
-            "另外ma均線提供長期量能，若量能低於均線，代表市場可能趨於保守。"
+        "Quantitative Analysis": (
+            "This analysis includes volume, 20-day moving average (MA), "
+            "and the rate of change of the 20-day standard deviation (STD) to help judge volume volatility and price trends. "
+            "If volume and STD increase together, it indicates high market activity; otherwise, it may indicate major investors exiting or market cooling down. "
+            "Additionally, the MA provides a long-term volume trend; if volume is below the MA, the market might be conservative."
         ),
-        "A": "選項 A 的分析說明，待補充。",
-        "B": "選項 B 的分析說明，待補充。",
-        "C": "選項 C 的分析說明，待補充。",
+        "A": "Description for option A (to be added).",
+        "B": "Description for option B (to be added).",
+        "C": "Description for option C (to be added).",
     }
 
-    if analysis_option == "統計量化分析":
-        st.markdown(f"**分析說明：** {analysis_descriptions['統計量化分析']}")
+    if analysis_option == "Quantitative Analysis":
+        st.markdown(f"**Analysis Description:** {analysis_descriptions['Quantitative Analysis']}")
 
         data = yf.download(symbol, period="90d", interval="1d", progress=False)
         if data.empty:
-            st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
+            st.error("⚠️ Unable to fetch data. Please check the stock symbol.")
             return
 
-        # 計算20日均線及標準差
+        # Calculate 20-day moving average and std deviation for volume
         data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
         data["volume_std20"] = data["Volume"].rolling(window=20).std()
-        data["std_change_rate"] = data["volume_std20"].pct_change()  # 標準差變動率
 
-        # 設定三張圖大小及格式
-        fig_size = (6, 3)  # 可調整大小 (寬, 高)
+        # Focus on the last 20 days for plotting
+        recent_data = data.tail(20)
 
+        fig_size = (6, 3)
         col1, col2, col3 = st.columns(3)
 
-        # 成交量折線圖
+        # Price (Close) Chart
         with col1:
             fig1, ax1 = plt.subplots(figsize=fig_size)
-            ax1.plot(data.index, data["Volume"], label="成交量", color="blue")
-            ax1.plot(data.index, data["volume_ma20"], label="20日均線", color="orange")
-            ax1.set_title("成交量與20日均線")
+            ax1.plot(recent_data.index, recent_data["Close"], label="Price", color="blue")
+            ax1.set_title("Price")
             ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax1.get_xticklabels(), rotation=45, fontsize=8)
             ax1.legend()
             ax1.grid(True)
             st.pyplot(fig1)
 
-        # 20日標準差折線圖
+        # Volume and 20-day MA Chart
         with col2:
             fig2, ax2 = plt.subplots(figsize=fig_size)
-            ax2.plot(data.index, data["volume_std20"], label="20日標準差", color="green")
-            ax2.set_title("20日成交量標準差")
+            ax2.plot(recent_data.index, recent_data["Volume"], label="Volume", color="blue")
+            ax2.plot(recent_data.index, recent_data["volume_ma20"], label="20-day MA", color="orange")
+            ax2.set_title("Volume & 20-day MA")
             ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax2.get_xticklabels(), rotation=45, fontsize=8)
             ax2.legend()
             ax2.grid(True)
             st.pyplot(fig2)
 
-        # 20日標準差變動率折線圖
+        # 20-day Standard Deviation Chart
         with col3:
             fig3, ax3 = plt.subplots(figsize=fig_size)
-            ax3.plot(data.index, data["std_change_rate"], label="標準差變動率", color="red")
-            ax3.set_title("標準差變動率")
+            ax3.plot(recent_data.index, recent_data["volume_std20"], label="20-day Std Dev", color="green")
+            ax3.set_title("20-day Std Dev")
             ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax3.get_xticklabels(), rotation=45, fontsize=8)
             ax3.legend()
@@ -76,11 +77,10 @@ def run(symbol):
             st.pyplot(fig3)
 
     else:
-        st.info("此分析類型尚未實作。")
+        st.info("This analysis type is not yet implemented.")
 
-# Streamlit主程式
 if __name__ == "__main__":
-    st.title("股票技術面分析")
-    symbol = st.text_input("輸入股票代碼（例如：AAPL）", "AAPL")
+    st.title("Stock Technical Analysis")
+    symbol = st.text_input("Enter stock symbol (e.g., AAPL)", "AAPL")
     if symbol:
         run(symbol)
