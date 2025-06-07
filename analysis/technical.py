@@ -1,7 +1,6 @@
 import yfinance as yf
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
@@ -13,19 +12,15 @@ def run(symbol):
         st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
         return
 
-    # 計算 20 日移動平均與標準差，並強制轉成 int
-    data["volume_ma20"] = data["Volume"].rolling(window=20).mean().fillna(0).astype(int)
-    data["volume_std20"] = data["Volume"].rolling(window=20).std().fillna(0).astype(int)
+    # 強制轉為 int 後再計算 MA、STD
     data["Volume"] = data["Volume"].fillna(0).astype(int)
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean().astype(int)
+    data["volume_std20"] = data["Volume"].rolling(window=20).std().astype(int)
 
-    # 計算 Z-score（若 std 為 0，則結果設為 NaN）
-    data["zscore_volume"] = np.where(
-        data["volume_std20"] != 0,
-        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"],
-        np.nan
-    )
+    # 計算 Z-score（無條件計算，不做例外處理）
+    data["zscore_volume"] = (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
 
-    # 顯示格式與數據內容
+    # 顯示格式與數據內容（for debug）
     st.write("🔍 資料型別")
     st.write("Volume dtype:", data["Volume"].dtype)
     st.write("volume_ma20 dtype:", data["volume_ma20"].dtype)
