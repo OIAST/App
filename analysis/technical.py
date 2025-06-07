@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 
 def format_volume(volume):
+    """將成交量數字轉為含萬單位（例：12.3 萬）"""
     try:
         volume = float(volume)
         if volume >= 10_000:
@@ -15,31 +16,33 @@ def format_volume(volume):
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 抓取近 90 天資料
-    data = yf.download(symbol, period="90d", interval="1d", progress=False)
+    # 抓取近 1 年日線資料，確保 z-score 計算有足夠樣本
+    data = yf.download(symbol, period="1y", interval="1d", progress=False)
 
-    if data.empty or "Volume" not in data.columns:
-        st.error("⚠️ 無法取得有效資料或缺少 Volume 欄位。")
+    if data.empty:
+        st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
         return
 
-    # 計算 20MA 與 20STD
+    if "Volume" not in data.columns:
+        st.error("⚠️ 資料中缺少 Volume 欄位。")
+        return
+
+    # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 zscore_volume
-    data["zscore_volume"] = (
-        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
-    )
+    # 計算 zscore_volume，僅針對非 NaN 值進行
+    valid = data.dropna(subset=["Volume", "volume_ma20", "volume_std20"])
+    zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
+    data["zscore_volume"] = pd.Series(zscore, index=valid.index)
 
-    # ⚠️ 在這裡先建立「乾淨版」資料，只保留 zscore 有值的行
-    clean_data = data.dropna(subset=["zscore_volume"]).copy()
-
-    # 顯示用表格格式化
-    display_data = clean_data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
+    # 建立顯示用 DataFrame
+    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
     display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
     display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
     display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
+    # 顯示最近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
-    st.dataframe(display_data.tail(30))
+    st.dataframe(display_data.tail(30), use_container_width=True)
