@@ -30,7 +30,7 @@ def run(symbol):
         return
 
     # 確保 Volume 欄為純數字
-    data["Volume"] = pd.to_numeric(data["Volume"], errors="coerce")
+    
 
     # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
