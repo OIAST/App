@@ -2,38 +2,42 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
+def format_volume(volume):
+    """將成交量轉為數字格式（整數），可依需求再加萬單位"""
+    try:
+        return int(float(volume))
+    except:
+        return volume
+
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 抓取資料
+    # 抓取近 90 天日線資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
     if data.empty:
         st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
         return
 
-    if "Volume" not in data.columns:
-        st.error("⚠️ 資料中缺少 Volume 欄位")
-        return
-
-    # 強制轉換 Volume 為數字
-    
+    # 確保 Volume 欄為純數字
+    data["Volume"] = pd.to_numeric(data["Volume"], errors="coerce")
 
     # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 Z-score
-    required_cols = ["Volume", "volume_ma20", "volume_std20"]
-    valid = data.dropna(subset=required_cols).copy()
-    zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
-    data["zscore_volume"] = None
-    data.loc[valid.index, "zscore_volume"] = zscore
+    # 計算 zscore（不使用 dropna）
+    data["zscore_volume"] = (
+        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    )
 
-    # 建立顯示用表格
+    # 建立顯示用的 DataFrame（不轉萬單位）
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
+    display_data["Volume"] = display_data["Volume"].apply(format_volume)
+    display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
+    display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
     display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    # 顯示近 30 筆資料（表格方式）
+    # 顯示最近 30 筆資料（含 NaN，不 drop）
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30))
