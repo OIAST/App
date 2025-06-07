@@ -27,7 +27,7 @@ def run(symbol):
     if analysis_option == "Quantitative Analysis":
         st.markdown(f"**Analysis Description:** {analysis_descriptions['Quantitative Analysis']}")
 
-        data = yf.download(symbol, period="90d", interval="1d", progress=False)
+        data = yf.download(symbol, period="20d", interval="1d", progress=False)
         if data.empty:
             st.error("⚠️ Unable to fetch data. Please check the stock symbol.")
             return
@@ -36,16 +36,13 @@ def run(symbol):
         data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
         data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-        # Focus on the last 20 days for plotting
-        recent_data = data.tail(20)
-
         fig_size = (6, 3)
         col1, col2, col3 = st.columns(3)
 
         # Price (Close) Chart
         with col1:
             fig1, ax1 = plt.subplots(figsize=fig_size)
-            ax1.plot(recent_data.index, recent_data["Close"], label="Price", color="blue")
+            ax1.plot(data.index, data["Close"], label="Price", color="blue")
             ax1.set_title("Price")
             ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax1.get_xticklabels(), rotation=45, fontsize=8)
@@ -56,8 +53,8 @@ def run(symbol):
         # Volume and 20-day MA Chart
         with col2:
             fig2, ax2 = plt.subplots(figsize=fig_size)
-            ax2.plot(recent_data.index, recent_data["Volume"], label="Volume", color="blue")
-            ax2.plot(recent_data.index, recent_data["volume_ma20"], label="20-day MA", color="orange")
+            ax2.plot(data.index, data["Volume"], label="Volume", color="blue")
+            ax2.plot(data.index, data["volume_ma20"], label="20-day MA", color="orange")
             ax2.set_title("Volume & 20-day MA")
             ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax2.get_xticklabels(), rotation=45, fontsize=8)
@@ -68,7 +65,7 @@ def run(symbol):
         # 20-day Standard Deviation Chart
         with col3:
             fig3, ax3 = plt.subplots(figsize=fig_size)
-            ax3.plot(recent_data.index, recent_data["volume_std20"], label="20-day Std Dev", color="green")
+            ax3.plot(data.index, data["volume_std20"], label="20-day Std Dev", color="green")
             ax3.set_title("20-day Std Dev")
             ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
             plt.setp(ax3.get_xticklabels(), rotation=45, fontsize=8)
