@@ -8,3 +8,5 @@ bcrypt
 rapidfuzz
 plotly
 numpy
+scikit-learn
+xgboost
