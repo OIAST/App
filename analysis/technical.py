@@ -37,41 +37,41 @@ def run(symbol):
         data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
         fig_size = (6, 3)
-        col1, col2, col3 = st.columns(3)
 
-        # Price (Close) Chart
+        # 第一列：Volume & 20-day MA 與 20-day Std Dev 並排
+        col1, col2 = st.columns(2)
+
         with col1:
-            fig1, ax1 = plt.subplots(figsize=fig_size)
-            ax1.plot(data.index, data["Close"], label="Price", color="blue")
-            ax1.set_title("Price")
-            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-            plt.setp(ax1.get_xticklabels(), rotation=45, fontsize=8)
-            ax1.legend()
-            ax1.grid(True)
-            st.pyplot(fig1)
+            fig_vol_ma, ax_vol_ma = plt.subplots(figsize=fig_size)
+            ax_vol_ma.plot(data.index, data["Volume"], label="Volume", color="blue")
+            ax_vol_ma.plot(data.index, data["volume_ma20"], label="20-day MA", color="orange")
+            ax_vol_ma.set_title("Volume & 20-day MA")
+            ax_vol_ma.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+            plt.setp(ax_vol_ma.get_xticklabels(), rotation=45, fontsize=8)
+            ax_vol_ma.legend()
+            ax_vol_ma.grid(True)
+            st.pyplot(fig_vol_ma)
 
-        # Volume and 20-day MA Chart
         with col2:
-            fig2, ax2 = plt.subplots(figsize=fig_size)
-            ax2.plot(data.index, data["Volume"], label="Volume", color="blue")
-            ax2.plot(data.index, data["volume_ma20"], label="20-day MA", color="orange")
-            ax2.set_title("Volume & 20-day MA")
-            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-            plt.setp(ax2.get_xticklabels(), rotation=45, fontsize=8)
-            ax2.legend()
-            ax2.grid(True)
-            st.pyplot(fig2)
+            fig_std, ax_std = plt.subplots(figsize=fig_size)
+            ax_std.plot(data.index, data["volume_std20"], label="20-day Std Dev", color="green")
+            ax_std.set_title("20-day Std Dev")
+            ax_std.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+            plt.setp(ax_std.get_xticklabels(), rotation=45, fontsize=8)
+            ax_std.legend()
+            ax_std.grid(True)
+            st.pyplot(fig_std)
 
-        # 20-day Standard Deviation Chart
-        with col3:
-            fig3, ax3 = plt.subplots(figsize=fig_size)
-            ax3.plot(data.index, data["volume_std20"], label="20-day Std Dev", color="green")
-            ax3.set_title("20-day Std Dev")
-            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-            plt.setp(ax3.get_xticklabels(), rotation=45, fontsize=8)
-            ax3.legend()
-            ax3.grid(True)
-            st.pyplot(fig3)
+        # 第二列：價格圖獨立顯示
+        st.markdown("### Price Chart")
+        fig_price, ax_price = plt.subplots(figsize=(12, 3))
+        ax_price.plot(data.index, data["Close"], label="Price", color="blue")
+        ax_price.set_title("Price")
+        ax_price.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        plt.setp(ax_price.get_xticklabels(), rotation=45, fontsize=8)
+        ax_price.legend()
+        ax_price.grid(True)
+        st.pyplot(fig_price)
 
     else:
         st.info("This analysis type is not yet implemented.")
