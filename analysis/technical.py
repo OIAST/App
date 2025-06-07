@@ -27,16 +27,28 @@ def run(symbol):
     # 計算 20 日平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
-
-    # 計算標準差變動率（今日與昨日差的比率）
+    # 計算標準差變動率
     data["volume_std20_change"] = data["volume_std20"].pct_change()
 
     # 篩選最近 30 筆資料
     recent_data = data.tail(30)
     dates = recent_data.index.strftime("%y/%m/%d")
 
+    # 股價走勢圖 (Close)
+    st.write("📉 股價走勢 (Close)")
+    fig_close, ax_close = plt.subplots(figsize=(10, 3))
+    ax_close.plot(dates, recent_data["Close"], color="green", label="Close Price")
+    ax_close.set_title("Stock Closing Price")
+    ax_close.set_xlabel("Date")
+    ax_close.set_ylabel("Price")
+    ax_close.tick_params(axis='x', labelsize=8)
+    ax_close.grid(True)
+    ax_close.legend()
+    fig_close.autofmt_xdate(rotation=45)
+    st.pyplot(fig_close)
+
     # 成交量與 MA 折線圖
-    st.write("📈 Volume & MA20")
+    st.write("📈 Volume & 20-Day MA")
     fig1, ax1 = plt.subplots(figsize=(10, 3))
     ax1.plot(dates, recent_data["Volume"], label="Volume", color="skyblue")
     ax1.plot(dates, recent_data["volume_ma20"], label="20-Day MA", color="orange")
