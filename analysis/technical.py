@@ -3,9 +3,15 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 主程式
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
+
+    # 技術分析選單
+    analysis_option = st.selectbox(
+        "選擇技術分析類型",
+        ["統計量化分析", "A", "B", "C"]
+    )
+    st.write(f"目前選擇：{analysis_option}")
 
     # 抓取近 90 天資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
@@ -22,8 +28,7 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算變動率（今日與昨日差的比率）
-    data["volume_ma20_change"] = data["volume_ma20"].pct_change()
+    # 計算標準差變動率（今日與昨日差的比率）
     data["volume_std20_change"] = data["volume_std20"].pct_change()
 
     # 篩選最近 30 筆資料
@@ -58,16 +63,8 @@ def run(symbol):
     fig2.autofmt_xdate(rotation=45)
     st.pyplot(fig2)
 
-    # 平均值變動率圖
-    st.write("📉 20-Day MA Change Rate")
-    fig3, ax3 = plt.subplots(figsize=(10, 3))
-    ax3.plot(dates, recent_data["volume_ma20_change"], color="green", label="MA Change Rate")
-    ax3.axhline(0, color="gray", linestyle="--", linewidth=1)
-    ax3.set_title("20-Day MA Change Rate")
-    ax3.set_xlabel("Date")
-    ax3.set_ylabel("Change Rate")
-    ax3.tick_params(axis='x', labelsize=8)
-    ax3.grid(True)
-    ax3.legend()
-    fig3.autofmt_xdate(rotation=45)
-    st.pyplot(fig3)
+if __name__ == "__main__":
+    st.title("股票技術分析工具")
+    stock_input = st.text_input("輸入股票代碼（例如 AAPL）", value="AAPL")
+    if stock_input:
+        run(stock_input.upper())
