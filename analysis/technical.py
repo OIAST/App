@@ -3,11 +3,11 @@ import streamlit as st
 import pandas as pd
 
 def format_volume(volume):
-    """將成交量轉為『萬』為單位（如：12.3 萬）"""
+    """將成交量數字轉為含萬單位（例：12.3 萬）"""
     try:
         volume = float(volume)
         if volume >= 10_000:
-            return f"{volume / 10_000:.1f} 萬"
+            return f"{volume / 10000:.1f} 萬"
         else:
             return f"{volume:.0f}"
     except:
@@ -31,12 +31,16 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 z-score（僅計算有完整資料的 row）
-    valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
-    zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
-    data["zscore_volume"] = pd.Series(zscore, index=valid.index)
+    # 計算 z-score（避免 ValueError）
+    required_cols = ["Volume", "volume_ma20", "volume_std20"]
+    if all(col in data.columns for col in required_cols):
+        valid = data[required_cols].dropna()
+        zscore_volume = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
+        data.loc[valid.index, "zscore_volume"] = zscore_volume
+    else:
+        st.warning("⚠️ 缺少欄位，無法計算 Z-score。")
 
-    # 建立顯示用 DataFrame 並格式化
+    # 建立顯示用的 DataFrame
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
     display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
@@ -44,5 +48,5 @@ def run(symbol):
     display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
     # 顯示最近 30 筆資料
-    st.write("📈 成交量與 Z-Score（近 30 日）")
+    st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30))
