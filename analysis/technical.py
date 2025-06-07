@@ -21,20 +21,24 @@ def run(symbol):
         st.error("⚠️ 資料中缺少 Volume 欄位。")
         return
 
-    # 強制逐筆轉成 float
     data["Volume"] = data["Volume"].apply(safe_float)
 
-    # 計算 20日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
+    valid = data.dropna(subset=["Volume", "volume_ma20", "volume_std20"])
     zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
     data.loc[valid.index, "zscore_volume"] = zscore
 
+    # 確認欄位名存在
+    required_cols = ["volume_ma20", "volume_std20", "zscore_volume"]
+    for col in required_cols:
+        if col not in data.columns:
+            st.error(f"⚠️ 欄位 {col} 不存在，請檢查資料。")
+            return
+
+    recent_data = data.dropna(subset=required_cols).tail(30)
+
     st.write("🔢 近 30 日成交量分析（純數字呈現）")
-
-    recent_data = data.dropna(subset=["volume_ma20", "volume_std20", "zscore_volume"]).tail(30)
-
     for date, row in recent_data.iterrows():
         st.write(f"📅 {date.date()}｜Volume: {int(row['Volume'])}｜MA20: {int(row['volume_ma20'])}｜STD20: {int(row['volume_std20'])}｜Z-Score: {row['zscore_volume']:.2f}")
