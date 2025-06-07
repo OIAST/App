@@ -35,13 +35,15 @@ def run(symbol):
         zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
         data.loc[valid.index, "zscore_volume"] = zscore
 
-    # 建立顯示用的 DataFrame（含轉換格式）
-    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
-    display_data["Volume"] = display_data["Volume"].apply(format_volume)
-    display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
-    display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
-    display_data["zscore_volume"] = display_data["zscore_volume"].astype(float).round(2)
+    # 先取出 z-score 有值的資料
+    valid_display_data = data.dropna(subset=["zscore_volume"]).copy()
 
-    # 顯示近 30 筆有 Z-score 的資料
+    # 建立顯示用 DataFrame
+    valid_display_data["Volume"] = valid_display_data["Volume"].apply(format_volume)
+    valid_display_data["volume_ma20"] = valid_display_data["volume_ma20"].apply(format_volume)
+    valid_display_data["volume_std20"] = valid_display_data["volume_std20"].apply(format_volume)
+    valid_display_data["zscore_volume"] = valid_display_data["zscore_volume"].round(2)
+
+    # 顯示最近 30 筆有效資料
     st.write("📈 成交量與 Z-score（近 30 日）")
-    st.dataframe(display_data.dropna(subset=["zscore_volume"]).tail(30))
+    st.dataframe(valid_display_data.tail(30))
