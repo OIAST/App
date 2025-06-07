@@ -16,19 +16,20 @@ def run(symbol):
         st.error("⚠️ 資料中缺少 Volume 欄位。")
         return
 
-    # 強制轉換成數值格式（避免因格式錯誤導致計算失敗）
+    # 將 Volume 欄位強制轉換為數值型別，移除非數字資料
     data["Volume"] = pd.to_numeric(data["Volume"], errors="coerce")
 
     # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 再次確保這三欄都是數值格式
+    # 再次轉換為數字，確保沒有格式錯誤
     data["volume_ma20"] = pd.to_numeric(data["volume_ma20"], errors="coerce")
     data["volume_std20"] = pd.to_numeric(data["volume_std20"], errors="coerce")
 
-    # 建立條件篩選，只對有數值 & std ≠ 0 的資料做 Z-score 計算
+    # 建立條件遮罩：三欄都為數字且 std ≠ 0
     mask = (
+        data["Volume"].notna() &
         data["volume_ma20"].notna() &
         data["volume_std20"].notna() &
         (data["volume_std20"] != 0)
@@ -46,3 +47,6 @@ def run(symbol):
     # 顯示最近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30))
+
+# 範例執行（在 streamlit 主程式中會用 run("你的股票代碼") 呼叫）
+# run("2330.TW")
