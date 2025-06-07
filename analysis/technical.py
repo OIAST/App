@@ -31,13 +31,10 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 z-score（只套用在有完整資料的 row 上）
-    if all(col in data.columns for col in ["Volume", "volume_ma20", "volume_std20"]):
-        valid = data[["Volume", "volume_ma20", "volume_std20"]].dropna()
-        zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
-        data.loc[valid.index, "zscore_volume"] = zscore
-    else:
-        st.warning("⚠️ 缺少欄位，無法計算 Z-score")
+    # ✅ 正確計算 Z-score（確保 index 對齊，不會全部為 NaN）
+    data["zscore_volume"] = (
+        (data["Volume"] - data["volume_ma20"]) / data["volume_std20"]
+    )
 
     # 建立顯示用的 DataFrame（轉換成交量格式）
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
