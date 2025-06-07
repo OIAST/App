@@ -16,7 +16,7 @@ def format_volume(volume):
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
-    # 抓取近 1 年日線資料，確保 z-score 計算有足夠樣本
+    # 抓取近 1 年日線資料
     data = yf.download(symbol, period="1y", interval="1d", progress=False)
 
     if data.empty:
@@ -31,18 +31,19 @@ def run(symbol):
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 計算 zscore_volume，僅針對非 NaN 值進行
-    valid = data.dropna(subset=["Volume", "volume_ma20", "volume_std20"])
-    zscore = (valid["Volume"] - valid["volume_ma20"]) / valid["volume_std20"]
-    data["zscore_volume"] = pd.Series(zscore, index=valid.index)
+    # 確保欄位存在且無 NaN 才能計算 Z-score
+    mask = data[["Volume", "volume_ma20", "volume_std20"]].notna().all(axis=1)
+    data.loc[mask, "zscore_volume"] = (
+        (data.loc[mask, "Volume"] - data.loc[mask, "volume_ma20"]) / data.loc[mask, "volume_std20"]
+    )
 
-    # 建立顯示用 DataFrame
+    # 建立顯示用表格
     display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].copy()
     display_data["Volume"] = display_data["Volume"].apply(format_volume)
     display_data["volume_ma20"] = display_data["volume_ma20"].apply(format_volume)
     display_data["volume_std20"] = display_data["volume_std20"].apply(format_volume)
     display_data["zscore_volume"] = display_data["zscore_volume"].round(2)
 
-    # 顯示最近 30 筆資料
+    # 顯示近 30 筆資料
     st.write("📈 成交量與 Z-score（近 30 日）")
     st.dataframe(display_data.tail(30), use_container_width=True)
