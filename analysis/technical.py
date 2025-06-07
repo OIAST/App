@@ -1,62 +1,100 @@
 import yfinance as yf
 import streamlit as st
+import pandas as pd
 import matplotlib.pyplot as plt
 
 def run(symbol):
     st.subheader(f"📊 技術面分析：{symbol}")
 
+    # 技術分析選單
     analysis_option = st.selectbox(
         "選擇技術分析類型",
         ["統計量化分析", "A", "B", "C"]
     )
     st.write(f"目前選擇：{analysis_option}")
 
+    # 解析說明區
     analysis_descriptions = {
-        "統計量化分析": (
-            "此分析包含成交量、20日均線及其標準差的變動率，幫助判斷成交量波動性及股價走勢，"
-            "量能若與STD標準差同上代表市場熱度高，反之則代表大戶離場或市場減熱，"
-            "另外ma均線提供長期量能，若量能低於均線，代表市場可能趨於保守。"
-        ),
+        "統計量化分析": "此分析包含成交量、20日均線及其標準差的變動率，幫助判斷成交量波動性及股價走勢。",
         "A": "選項 A 的分析說明，待補充。",
         "B": "選項 B 的分析說明，待補充。",
         "C": "選項 C 的分析說明，待補充。",
     }
     st.markdown(f"**分析說明：** {analysis_descriptions.get(analysis_option, '無說明')}")
 
+    # 抓取近 90 天資料
     data = yf.download(symbol, period="90d", interval="1d", progress=False)
 
+    if data.empty:
+        st.error("⚠️ 無法取得資料，請確認股票代碼是否正確。")
+        return
 
+    if "Volume" not in data.columns:
+        st.error("⚠️ 資料中缺少 Volume 欄位。")
+        return
 
-你的分析理論很有道理，整理一下我理解的重點：
+    # 計算 20 日平均與標準差
+    data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
+    data["volume_std20"] = data["Volume"].rolling(window=20).std()
+    # 計算標準差變動率
+    data["volume_std20_change"] = data["volume_std20"].pct_change()
 
-1. **成交量與20日均線（MA）**：  
-   - MA 是成交量的長期趨勢指標，代表市場的平均活躍度。  
-   - 如果成交量低於 MA，表示市場整體趨於保守、成交冷清。
+    # 篩選最近 30 筆資料
+    recent_data = data.tail(30)
+    # 只顯示月/日格式
+    dates = recent_data.index.strftime("%m/%d")
 
-2. **成交量的20日標準差（STD）與變動率**：  
-   - STD 代表成交量波動的強弱。  
-   - 如果成交量和STD 同時上升，表示成交量的波動性大且成交量高，代表市場熱度高、資金活躍。  
-   - 如果成交量和STD 同時下降或分歧，則可能是大戶離場、資金冷卻，市場減熱。
+    # 用st.columns並排三張圖表，統一大小和對齊
+    col1, col2, col3 = st.columns(3)
 
-3. **整合判斷**：  
-   - 量能與STD同向上 → 市場熱度高、資金活躍。  
-   - 量能與STD背離或下降 → 市場降溫、資金撤退。  
-   - 量能低於20日均線 → 市場趨於保守。
+    fig_size = (5, 3)
 
-這套判斷邏輯屬於常見的量能分析思路，核心在「成交量的波動幅度（STD）」與「量能本身（成交量及均線）」的配合觀察。
+    with col1:
+        st.write("📉 股價走勢 (Close)")
+        fig_close, ax_close = plt.subplots(figsize=fig_size)
+        ax_close.plot(dates, recent_data["Close"], color="green", label="Close Price")
+        ax_close.set_title("Stock Closing Price")
+        ax_close.set_xlabel("Date")
+        ax_close.set_ylabel("Price")
+        ax_close.tick_params(axis='x', labelsize=8)
+        ax_close.grid(True)
+        ax_close.legend()
+        fig_close.autofmt_xdate(rotation=45)
+        plt.tight_layout()
+        st.pyplot(fig_close)
 
----
+    with col2:
+        st.write("📈 成交量 & 20日均線")
+        fig_vol, ax_vol = plt.subplots(figsize=fig_size)
+        ax_vol.plot(dates, recent_data["Volume"], label="Volume", color="skyblue")
+        ax_vol.plot(dates, recent_data["volume_ma20"], label="20-Day MA", color="orange")
+        ax_vol.set_title("Volume and 20-Day MA")
+        ax_vol.set_xlabel("Date")
+        ax_vol.set_ylabel("Volume")
+        ax_vol.tick_params(axis='x', labelsize=8)
+        ax_vol.legend()
+        ax_vol.grid(True)
+        fig_vol.autofmt_xdate(rotation=45)
+        plt.tight_layout()
+        st.pyplot(fig_vol)
 
-### 我建議的補充或提醒：
+    with col3:
+        st.write("📉 20日標準差變動率")
+        fig_std, ax_std = plt.subplots(figsize=fig_size)
+        ax_std.plot(dates, recent_data["volume_std20_change"], color="purple", label="STD Change Rate")
+        ax_std.axhline(0, color="gray", linestyle="--", linewidth=1)
+        ax_std.set_title("20-Day STD Change Rate")
+        ax_std.set_xlabel("Date")
+        ax_std.set_ylabel("Change Rate")
+        ax_std.tick_params(axis='x', labelsize=8)
+        ax_std.legend()
+        ax_std.grid(True)
+        fig_std.autofmt_xdate(rotation=45)
+        plt.tight_layout()
+        st.pyplot(fig_std)
 
-- **STD數值本身不說明方向**，只是波動幅度，配合量能的上升或下降趨勢來判斷熱度。  
-- 你也可以觀察STD的變化率（即STD的斜率），增減趨勢更能提示市場活躍度變化。  
-- 若要更嚴謹，可以加入價格走勢（如均線趨勢）一起佐證量能的強弱，避免單純量能波動誤判。  
-
----
-
-### 總結：
-
-你的理論很合理，量能與其波動性的聯合分析確實是判斷市場熱度和資金動向的好方法，且20日均線有助於觀察長期趨勢，STD幫你了解波動幅度，兩者搭配能獲得比較全面的訊號。
-
-如果你有需要，我可以幫你設計更細緻的量能指標計算或示意圖說明，甚至用程式實作分析工具也可以。你覺得呢？
+if __name__ == "__main__":
+    st.title("股票技術分析工具")
+    stock_input = st.text_input("輸入股票代碼（例如 AAPL）", value="AAPL")
+    if stock_input:
+        run(stock_input.upper())
