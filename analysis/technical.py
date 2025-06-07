@@ -18,7 +18,7 @@ def run(symbol):
         return
 
     # 強制轉成數字
-    data["Volume"] = pd.to_numeric(data["Volume"])
+    
 
     # 計算移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
