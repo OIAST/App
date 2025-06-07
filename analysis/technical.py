@@ -13,11 +13,16 @@ def run(symbol):
         st.error("⚠️ 無法取得資料或缺少 Volume 欄位。")
         return
 
-    # 計算 20 日成交量移動平均與標準差
+    # 計算 20 日移動平均與標準差
     data["volume_ma20"] = data["Volume"].rolling(window=20).mean()
     data["volume_std20"] = data["Volume"].rolling(window=20).std()
 
-    # 防止 NaN 錯誤：只有當三個欄位都有值時才計算 Z-score
+    # 印出 Volume、MA20、STD20 的部分資料與型別
+    st.write("📋 檢查數據格式（Volume / MA / STD）前 5 筆：")
+    st.write(data[["Volume", "volume_ma20", "volume_std20"]].head())
+    st.code(str(data[["Volume", "volume_ma20", "volume_std20"]].dtypes), language="python")
+
+    # 計算 z-score（條件：三欄都不為 NaN）
     condition = (
         data["Volume"].notnull() &
         data["volume_ma20"].notnull() &
@@ -30,6 +35,6 @@ def run(symbol):
     )
 
     # 顯示最近 30 筆資料
-    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30)
     st.write("📈 成交量與 Z-score（近 30 日）")
+    display_data = data[["Volume", "volume_ma20", "volume_std20", "zscore_volume"]].tail(30)
     st.dataframe(display_data)
