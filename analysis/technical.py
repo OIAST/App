@@ -2,9 +2,9 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from xgboost import XGBClassifier
+##from sklearn.model_selection import train_test_split
+##from sklearn.metrics import accuracy_score
+##from xgboost import XGBClassifier
 import numpy as np
 
 def run(symbol):
