@@ -32,7 +32,10 @@ else:
         chips.run(symbol)
     elif analysis_type == "基本面":
         fundamental.run(symbol)
-    elif analysis_type == "技術面":
-        technical.run(symbol)
     elif analysis_type == "股價機率分析":
         probability.run(symbol)
+
+
+
+## elif analysis_type == "技術面":
+       ## technical.run(symbol)
