@@ -10,7 +10,7 @@ if "username" not in st.session_state:
 
 from login import login, logout
 from ui import render_floating_price_box
-from analysis import chips, fundamental, technical, probability
+from analysis import chips, fundamental, probability
 
 # 頁面設定
 st.set_page_config(layout="wide")
