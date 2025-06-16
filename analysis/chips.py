@@ -3,13 +3,25 @@ import yfinance as yf
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import requests
 
+# 加入 headers 模擬正常瀏覽器行為
+headers = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
+}
+
+# 用 requests session 修改 yfinance 預設 session
+session = requests.Session()
+session.headers.update(headers)
+
+# 將 session 傳給 yfinance
 def run(symbol):
-    ticker = yf.Ticker(symbol)
+    ticker = yf.Ticker(symbol, session=session)
     expirations = ticker.options
     if not expirations:
-        st.warning(f"⚠️ 找不到 {symbol} 的期權資料")
+        st.warning(f"⚠️ 找不到 {symbol} 的期權資料，可能是請求過於頻繁或被封鎖")
         return
+
     expiry = st.selectbox("選擇期權到期日", expirations)
     if st.button("更新圖表"):
         try:
