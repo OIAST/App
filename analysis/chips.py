@@ -1,43 +1,56 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import requests
-import yfinance.shared
+from curl_cffi import requests
 
-# ✅ 新增：替換 yfinance 預設的 request session，加上 User-Agent
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "curl/7.68.0"
-})
-yf.shared._requests_session = session
-
+def get_options_data(symbol):
+    url = f"https://query2.finance.yahoo.com/v7/finance/options/{symbol}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        resp = requests.get(url, headers=headers, impersonate="chrome110")
+        data = resp.json()
+        return data
+    except Exception as e:
+        st.error(f"資料擷取失敗：{e}")
+        return None
 
 def run(symbol):
-    ticker = yf.Ticker(symbol)
-    expirations = ticker.options
-    if not expirations:
+    raw = get_options_data(symbol)
+    if not raw or 'optionChain' not in raw or not raw['optionChain']['result']:
         st.warning(f"⚠️ 找不到 {symbol} 的期權資料")
         return
 
-    expiry = st.selectbox("選擇期權到期日", expirations)
+    result = raw['optionChain']['result'][0]
+    spot_price = result['quote']['regularMarketPrice']
+    expirations = result['expirationDates']
+    options_by_date = {e: f"{pd.to_datetime(e, unit='s').date()}" for e in expirations}
+    
+    expiry_timestamps = list(options_by_date.keys())
+    expiry_labels = list(options_by_date.values())
+
+    selected = st.selectbox("選擇期權到期日", expiry_labels)
+    selected_ts = expiry_timestamps[expiry_labels.index(selected)]
 
     if st.button("更新圖表"):
+        url = f"https://query2.finance.yahoo.com/v7/finance/options/{symbol}?date={selected_ts}"
+        headers = {"User-Agent": "Mozilla/5.0"}
         try:
-            spot_price = ticker.history(period="1d")['Close'][-1]
-            options = ticker.option_chain(expiry)
-            options_df = pd.concat([
-                options.calls.assign(type='call'),
-                options.puts.assign(type='put')
-            ])
+            resp = requests.get(url, headers=headers, impersonate="chrome110")
+            chain = resp.json()
+            opt_result = chain['optionChain']['result'][0]
+            calls = pd.DataFrame(opt_result['options'][0]['calls'])
+            puts = pd.DataFrame(opt_result['options'][0]['puts'])
+            calls["type"] = "call"
+            puts["type"] = "put"
+            options_df = pd.concat([calls, puts])
             data = options_df[['strike', 'volume', 'impliedVolatility', 'type', 'lastPrice']].dropna()
 
             st.subheader("📊 成交量熱力圖")  
             pivot_vol = data.pivot_table(index='strike', columns='type', values='volume', aggfunc='sum', fill_value=0)  
             fig1, ax1 = plt.subplots(figsize=(10, 5))  
             sns.heatmap(pivot_vol, cmap="YlGnBu", cbar_kws={'label': 'Volume'}, ax=ax1)  
-            ax1.set_title(f"{symbol} Options Volume Heatmap ({expiry})")  
+            ax1.set_title(f"{symbol} Options Volume Heatmap ({selected})")  
             st.pyplot(fig1)  
 
             st.subheader("📌 市場情緒圖")  
@@ -66,5 +79,5 @@ def run(symbol):
             ax4.legend()  
             st.pyplot(fig4)  
 
-        except Exception as e:  
+        except Exception as e:
             st.error(f"錯誤：{e}")
