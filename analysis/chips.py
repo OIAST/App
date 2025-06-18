@@ -10,8 +10,6 @@ print(type(os.environ))
 # 初始化 API client
 finnhub_client = Client(api_key=os.environ.get("FINNHUB_API_KEY"))
 
-print("res type:", type(res))
-print("res content:", res)
 
 def run(symbol):
     try:
@@ -85,3 +83,7 @@ def run(symbol):
 
     except Exception as e:
         st.error(f"錯誤：{e}")
+        
+        
+print("res type:", type(res))
+print("res content:", res)
