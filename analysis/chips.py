@@ -10,6 +10,9 @@ print(type(os.environ))
 # 初始化 API client
 finnhub_client = Client(api_key=os.environ.get("FINNHUB_API_KEY"))
 
+print("res type:", type(res))
+print("res content:", res)
+
 def run(symbol):
     try:
         # 取得整份期權資料
