@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from finnhub import Client
 import os
 
+print(type(os.environ))
+
 # 初始化 API client
 finnhub_client = Client(api_key=os.environ.get("FINNHUB_API_KEY"))
 
