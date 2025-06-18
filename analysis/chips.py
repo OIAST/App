@@ -1,7 +1,6 @@
 import streamlit as st, pandas as pd, os
 import finnhub, seaborn as sns, matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide")
 f_client = finnhub.Client(api_key=os.getenv("FINNHUB_KEY"))
 
 def run(symbol):
