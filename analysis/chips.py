@@ -8,6 +8,7 @@ import os
 # 初始化 API client
 finnhub_client = Client(api_key=os.environ.get("d18kh2pr01qg5218kh5gd18kh2pr01qg5218kh60"))
 
+
 def run(symbol):
     try:
         # 取得整份期權資料
