@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_KEY = '你的API金鑰'  # 建議放 secrets.toml
+API_KEY = 'd18kh2pr01qg5218kh5gd18kh2pr01qg5218kh60'
 
 def render_floating_price_box(symbol):
     try:
