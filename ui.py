@@ -1,27 +1,35 @@
 import streamlit as st
-import yfinance as yf
+import requests
+
+API_KEY = '你的API金鑰'  # 建議放 secrets.toml
 
 def render_floating_price_box(symbol):
-    ticker = yf.Ticker(symbol)
     try:
-        data = ticker.history(period="1d", interval="1m")
-        if data.empty:
+        # 取得現價資料
+        url = f'https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}'
+        resp = requests.get(url).json()
+
+        current = resp['c']
+        previous = resp['pc']
+
+        if not current or not previous:
             return
-        current = data['Close'][-1]
-        previous = data['Close'][-2]
+
         change = current - previous
         pct = (change / previous) * 100
         color = 'green' if change >= 0 else 'red'
         arrow = "▲" if change >= 0 else "▼"
+
         st.markdown(f"""
         <div id="price-box" class="draggable">
-            <div style='font-size:14px; color:black;'>目前價格：</div>
+            <div style='font-size:14px; color:black;'>目前價格（{symbol.upper()}）：</div>
             <div style='font-size:20px; font-weight:bold; color:{color};'>{current:.2f} {arrow}</div>
             <div style='font-size:14px; color:{color};'>漲跌：{change:+.2f} ({pct:+.2f}%)</div>
         </div>
         """, unsafe_allow_html=True)
-    except:
-        pass
+
+    except Exception as e:
+        st.error(f"資料取得失敗：{e}")
 
     st.markdown("""
     <style>
